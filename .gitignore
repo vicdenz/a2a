@@ -1,0 +1,10 @@
+.env
+output/
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+.crawlee/
+
+CLAUDE.md
+PLAN.md
