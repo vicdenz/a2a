@@ -39,20 +39,13 @@ class SiteConfig(BaseModel):
 
 class SearchConfig(BaseModel):
     city: str = ""
-    neighborhood: str = ""
     anchor_address: str = ""
     anchor_lat: float | None = None   # geocoded at startup from anchor_address
     anchor_lng: float | None = None   # geocoded at startup from anchor_address
     max_distance_km: float | None = None
     move_in_date: str = ""
     lease_duration_months: int | None = None
-    min_bedrooms: int | None = None
-    max_bedrooms: int | None = None
-    min_bathrooms: int | None = None
-    unit_types: list[str] = Field(default_factory=list)
     max_monthly_rent: float | None = None
-    min_monthly_rent: float | None = None
-    min_sqft: int | None = None
 
 
 class RequirementsConfig(BaseModel):

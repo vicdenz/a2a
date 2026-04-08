@@ -17,7 +17,7 @@ scraping:
     headless: true
     request_delay_ms: 1000
     # Set to 50+ for production runs; keep at 10 for faster testing.
-    max_listings_per_site: 50
+    max_listings_per_site: 10
     max_retries: 3
     proxies: []
 
@@ -56,35 +56,17 @@ websites:
 
 # ─────────────────────────────────────────────
 # SEARCH PARAMETERS
-# Fill out this section with your rental requirements.
-# These values are injected into every site's search URL.
+# Used to build search URLs and set the scraping radius.
+# Detailed filtering happens in the HARD REQUIREMENTS section below.
 # ─────────────────────────────────────────────
 
 search:
-    # Location
     city: "Toronto"
-    # Scrapers search city-wide then filter by radius around anchor_address.
-    # neighborhood is only used for preference scoring, not URL filtering.
-    neighborhood: "Yorkville"
     anchor_address: "27 King's College Circle, Toronto, ON"
-    max_distance_km: 4 # radius in km around anchor_address used for both scraping and hard filter
-
-    # Dates
-    move_in_date: "2026-09-01" # e.g. "2026-09-01"
-    lease_duration_months: 8 # e.g. 8
-
-    # Unit Type
-    min_bedrooms: 2 # e.g. 1
-    max_bedrooms: 2 # e.g. 2
-    min_bathrooms: 1 # e.g. 1
-    unit_types: ["apartment", "condo"] # e.g. ["apartment", "condo", "basement", "house"]
-
-    # Budget
-    max_monthly_rent: 3000 # e.g. 2200 (CAD)
-    min_monthly_rent: 2000 # e.g. 800
-
-    # Size
-    min_sqft: null # e.g. 400
+    max_distance_km: 4 # radius in km around anchor_address
+    move_in_date: "2026-09-01"
+    lease_duration_months: 8 # used by Airbnb to compute checkout date
+    max_monthly_rent: 3200 # upper price cap injected into search URLs (CAD)
 
 # ─────────────────────────────────────────────
 # HARD REQUIREMENTS
@@ -97,10 +79,10 @@ requirements:
     min_bedrooms: 2
     max_distance_km: 4
     must_be_furnished: true
-    must_allow_pets: null
     must_have_laundry: true
-    must_have_parking: null
     short_term_ok: true
+    must_allow_pets: null
+    must_have_parking: null
     # Drop listings outside these neighborhoods (case-insensitive, substring match).
     # Leave empty [] to allow all neighborhoods (recommended — use max_distance_km instead).
     # AI-extracted neighborhood names are unreliable so this filter can be aggressive.
@@ -113,7 +95,7 @@ requirements:
 preferences:
     - name: "Yorkville neighbourhood"
       enabled: true
-      weight: 10
+      weight: 9
       description: "Prefer listings in Yorkville specifically"
       type: "neighborhood_match"
       values: ["Yorkville", "Bloor-Yorkville"]
@@ -124,19 +106,6 @@ preferences:
       description: "Prefer listings closer to anchor_address"
       type: "distance"
 
-    - name: "Lower rent"
-      enabled: false
-      weight: 7
-      description: "Prefer listings with lower monthly rent"
-      type: "price_asc"
-
-    - name: "Furnished"
-      enabled: true
-      weight: 8
-      description: "Prefer furnished units"
-      type: "boolean_field"
-      field: "furnished"
-
     - name: "In-unit laundry"
       enabled: true
       weight: 10
@@ -144,12 +113,39 @@ preferences:
       type: "boolean_field"
       field: "laundry_in_unit"
 
+    - name: "Gym / fitness center"
+      enabled: true
+      weight: 8
+      description: "Prefer buildings with a gym"
+      type: "boolean_field"
+      field: "gym"
+
+    - name: "Furnished"
+      enabled: true
+      weight: 9
+      description: "Prefer furnished units"
+      type: "boolean_field"
+      field: "furnished"
+
+    - name: "Balcony or outdoor space"
+      enabled: true
+      weight: 3
+      description: "Prefer units with a balcony, terrace, or yard"
+      type: "boolean_field"
+      field: "outdoor_space"
+
     - name: "Utilities included"
       enabled: true
-      weight: 4
+      weight: 2
       description: "Prefer rent that includes heat/hydro/water"
       type: "boolean_field"
       field: "utilities_included"
+
+    - name: "Lower rent"
+      enabled: false
+      weight: 6
+      description: "Prefer listings with lower monthly rent"
+      type: "price_asc"
 
     - name: "Parking included"
       enabled: false
@@ -164,20 +160,6 @@ preferences:
       description: "Prefer pet-friendly listings"
       type: "boolean_field"
       field: "pets_allowed"
-
-    - name: "Balcony or outdoor space"
-      enabled: true
-      weight: 6
-      description: "Prefer units with a balcony, terrace, or yard"
-      type: "boolean_field"
-      field: "outdoor_space"
-
-    - name: "Gym / fitness center"
-      enabled: true
-      weight: 8
-      description: "Prefer buildings with a gym"
-      type: "boolean_field"
-      field: "gym"
 
 # ── Output Settings ───────────────────────────
 output:

@@ -28,11 +28,12 @@ def _kijiji(search: SearchConfig) -> list[str]:
     # Build the category+attribute suffix
     suffix = f"c37l{loc_code}"
 
+    # Only use max_monthly_rent in URL (broad net). Min rent and bedrooms are
+    # checked later by the AI extraction + requirements filter, so we don't
+    # exclude "1+den" units or good deals at the URL level.
     params: dict[str, str] = {}
     if search.max_monthly_rent is not None:
         params["maxPrice"] = str(int(search.max_monthly_rent))
-    if search.min_monthly_rent is not None:
-        params["minPrice"] = str(int(search.min_monthly_rent))
 
     urls = []
     for page in range(1, 4):
@@ -48,17 +49,12 @@ def _kijiji(search: SearchConfig) -> list[str]:
 
 def _craigslist(search: SearchConfig) -> list[str]:
     base = "https://toronto.craigslist.org/search/apa"
+    # Only use max price and location in URL — cast a broad net.
+    # Bedroom count and min price are checked by the AI + requirements filter,
+    # so we don't exclude "1+den" or cheap-but-great listings at the URL level.
     params: dict[str, str] = {}
     if search.max_monthly_rent is not None:
         params["max_price"] = str(int(search.max_monthly_rent))
-    if search.min_monthly_rent is not None:
-        params["min_price"] = str(int(search.min_monthly_rent))
-    if search.min_bedrooms is not None:
-        params["min_bedrooms"] = str(search.min_bedrooms)
-    if search.max_bedrooms is not None:
-        params["max_bedrooms"] = str(search.max_bedrooms)
-    if search.min_sqft is not None:
-        params["minSqft"] = str(search.min_sqft)
     # Radius search: Craigslist supports lat/lon + search_distance (in miles)
     if search.anchor_lat is not None and search.anchor_lng is not None:
         params["lat"] = f"{search.anchor_lat:.6f}"
@@ -81,13 +77,12 @@ def _craigslist(search: SearchConfig) -> list[str]:
 def _rentals_ca(search: SearchConfig) -> list[str]:
     city = search.city.lower().replace(" ", "-") if search.city else "toronto"
     base = f"https://rentals.ca/{city}"
+    # Only use max rent in URL — cast a broad net.
+    # Min rent and bedroom count are checked by the AI + requirements filter,
+    # so we don't exclude "1+den" units or budget finds at the URL level.
     params: dict[str, str] = {}
     if search.max_monthly_rent is not None:
         params["rent_max"] = str(int(search.max_monthly_rent))
-    if search.min_monthly_rent is not None:
-        params["rent_min"] = str(int(search.min_monthly_rent))
-    if search.min_bedrooms is not None:
-        params["beds_min"] = str(search.min_bedrooms)
     urls = []
     for page in range(1, 4):
         p = dict(params)
@@ -105,6 +100,8 @@ def _airbnb(search: SearchConfig) -> list[str]:
     base = "https://www.airbnb.ca/s"
     city = search.city or "Toronto"
     location = quote(f"{city}--ON--Canada")
+    # Only use max price, dates, and monthly_stay in URL — cast a broad net.
+    # Min price and bedroom count are checked by the AI + requirements filter.
     params: dict[str, str] = {
         "tab_id": "home_tab",
         "refinement_paths[]": "/homes",
@@ -112,10 +109,6 @@ def _airbnb(search: SearchConfig) -> list[str]:
     }
     if search.max_monthly_rent is not None:
         params["price_max"] = str(int(search.max_monthly_rent))
-    if search.min_monthly_rent is not None:
-        params["price_min"] = str(int(search.min_monthly_rent))
-    if search.min_bedrooms is not None:
-        params["min_bedrooms"] = str(search.min_bedrooms)
     if search.move_in_date:
         params["checkin"] = search.move_in_date
     if search.move_in_date and search.lease_duration_months:
@@ -145,10 +138,6 @@ def _facebook_marketplace(search: SearchConfig) -> list[str]:
     params: dict[str, str] = {}
     if search.max_monthly_rent is not None:
         params["maxPrice"] = str(int(search.max_monthly_rent))
-    if search.min_monthly_rent is not None:
-        params["minPrice"] = str(int(search.min_monthly_rent))
-    if search.min_bedrooms is not None:
-        params["minBedrooms"] = str(search.min_bedrooms)
     url = f"{base}?{urlencode(params)}" if params else base
     return [url]
 

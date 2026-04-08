@@ -10,7 +10,7 @@ def filter_listings(listings: list[Listing], requirements: RequirementsConfig) -
     drop_counts: dict[str, int] = {}
 
     for listing in listings:
-        dropped = False
+        drop_reason: str | None = None
 
         # allowed_neighborhoods — if set, drop listings whose neighborhood
         # is known but doesn't match any of the allowed values (case-insensitive).
@@ -20,63 +20,62 @@ def filter_listings(listings: list[Listing], requirements: RequirementsConfig) -
             if listing.neighborhood is not None:
                 listing_hood = listing.neighborhood.lower()
                 if not any(a in listing_hood or listing_hood in a for a in allowed):
-                    drop_counts["allowed_neighborhoods"] = drop_counts.get("allowed_neighborhoods", 0) + 1
-                    dropped = True
+                    drop_reason = "allowed_neighborhoods"
 
         # max_monthly_rent — drop if missing or exceeds
-        if not dropped and requirements.max_monthly_rent is not None:
-            if listing.monthly_rent is None or listing.monthly_rent > requirements.max_monthly_rent:
-                drop_counts["max_monthly_rent"] = drop_counts.get("max_monthly_rent", 0) + 1
-                dropped = True
+        if drop_reason is None and requirements.max_monthly_rent is not None:
+            if listing.monthly_rent is None:
+                drop_reason = "max_monthly_rent (rent unknown)"
+            elif listing.monthly_rent > requirements.max_monthly_rent:
+                drop_reason = f"max_monthly_rent (${listing.monthly_rent:.0f} > ${requirements.max_monthly_rent})"
 
         # min_bedrooms — keep if missing (benefit of the doubt)
-        if not dropped and requirements.min_bedrooms is not None:
+        if drop_reason is None and requirements.min_bedrooms is not None:
             if listing.bedrooms is not None and listing.bedrooms < requirements.min_bedrooms:
-                drop_counts["min_bedrooms"] = drop_counts.get("min_bedrooms", 0) + 1
-                dropped = True
+                drop_reason = f"min_bedrooms ({listing.bedrooms} < {requirements.min_bedrooms})"
 
         # max_distance_km — drop if missing or exceeds
-        if not dropped and requirements.max_distance_km is not None:
-            if listing.distance_km is None or listing.distance_km > requirements.max_distance_km:
-                drop_counts["max_distance_km"] = drop_counts.get("max_distance_km", 0) + 1
-                dropped = True
+        if drop_reason is None and requirements.max_distance_km is not None:
+            if listing.distance_km is None:
+                drop_reason = "max_distance_km (distance unknown — geocoding failed or address not extracted)"
+            elif listing.distance_km > requirements.max_distance_km:
+                drop_reason = f"max_distance_km ({listing.distance_km:.1f}km > {requirements.max_distance_km}km)"
 
         # must_be_furnished — keep if missing (benefit of the doubt)
-        if not dropped and requirements.must_be_furnished is not None:
+        if drop_reason is None and requirements.must_be_furnished is not None:
             if listing.furnished is not None and listing.furnished != requirements.must_be_furnished:
-                drop_counts["must_be_furnished"] = drop_counts.get("must_be_furnished", 0) + 1
-                dropped = True
+                drop_reason = f"must_be_furnished (extracted: {listing.furnished})"
 
         # must_allow_pets — keep if missing
-        if not dropped and requirements.must_allow_pets is not None:
+        if drop_reason is None and requirements.must_allow_pets is not None:
             if listing.pets_allowed is not None and listing.pets_allowed != requirements.must_allow_pets:
-                drop_counts["must_allow_pets"] = drop_counts.get("must_allow_pets", 0) + 1
-                dropped = True
+                drop_reason = f"must_allow_pets (extracted: {listing.pets_allowed})"
 
         # must_have_laundry — check both in-unit and shared
-        if not dropped and requirements.must_have_laundry is not None and requirements.must_have_laundry:
+        if drop_reason is None and requirements.must_have_laundry is not None and requirements.must_have_laundry:
             has_laundry = (listing.laundry_in_unit is True) or (listing.laundry_shared is True)
             if listing.laundry_in_unit is not None or listing.laundry_shared is not None:
                 if not has_laundry:
-                    drop_counts["must_have_laundry"] = drop_counts.get("must_have_laundry", 0) + 1
-                    dropped = True
+                    drop_reason = "must_have_laundry (explicitly no laundry)"
 
         # must_have_parking — keep if missing
-        if not dropped and requirements.must_have_parking is not None:
+        if drop_reason is None and requirements.must_have_parking is not None:
             if listing.parking_included is not None and listing.parking_included != requirements.must_have_parking:
-                drop_counts["must_have_parking"] = drop_counts.get("must_have_parking", 0) + 1
-                dropped = True
+                drop_reason = f"must_have_parking (extracted: {listing.parking_included})"
 
         # short_term_ok — keep if missing
-        if not dropped and requirements.short_term_ok:
+        if drop_reason is None and requirements.short_term_ok:
             if listing.short_term_available is not None and listing.short_term_available is False:
-                drop_counts["short_term_ok"] = drop_counts.get("short_term_ok", 0) + 1
-                dropped = True
+                drop_reason = "short_term_ok (explicitly not short-term)"
 
-        if not dropped:
+        if drop_reason is None:
             passed.append(listing)
+        else:
+            label = listing.address or listing.url[:60]
+            print(f"  DROPPED [{listing.source}] {label[:60]} — {drop_reason}")
+            drop_counts[drop_reason.split(" (")[0]] = drop_counts.get(drop_reason.split(" (")[0], 0) + 1
 
-    # Log filter results
+    # Log filter summary
     total_dropped = len(listings) - len(passed)
     print(f"  Filtered: {len(passed)} passed, {total_dropped} dropped")
     for rule, count in sorted(drop_counts.items()):

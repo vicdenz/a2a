@@ -13,12 +13,26 @@ async def _extract_listing_urls(html: str, site: SiteConfig) -> list[str]:
     urls: set[str] = set()
     base = site.base_url.rstrip("/")
 
-    # Generic href extraction — grab links that look like individual listing pages
-    href_pattern = re.compile(r'href=["\']([^"\']+)["\']', re.IGNORECASE)
-    all_hrefs = href_pattern.findall(html)
-
     # Per-site heuristics for recognizing listing detail URLs
     builder = site.url_builder
+
+    # Rentals.ca: use listing-card permalink class instead of generic href matching.
+    # Building-name URLs (/toronto/immix, /toronto/akoya) are indistinguishable from
+    # category pages (/toronto/furnished, /toronto/pet-friendly) by URL pattern alone,
+    # but listing cards reliably use the `listing-card__permalink-button` class.
+    if builder == "rentals_ca":
+        card_pattern = re.compile(
+            r'listing-card__permalink-button[^>]*href=["\']([^"\'#]+)',
+            re.IGNORECASE,
+        )
+        for href in card_pattern.findall(html):
+            full_url = href if href.startswith("http") else base + href
+            urls.add(full_url)
+        return list(urls)
+
+    # Generic href extraction for all other sites
+    href_pattern = re.compile(r'href=["\']([^"\']+)["\']', re.IGNORECASE)
+    all_hrefs = href_pattern.findall(html)
 
     for href in all_hrefs:
         full_url = href if href.startswith("http") else base + href
@@ -31,18 +45,6 @@ async def _extract_listing_urls(html: str, site: SiteConfig) -> list[str]:
             urls.add(full_url)
         elif builder == "craigslist" and re.search(r"craigslist\.org/\w+/\w+/\d{8,}", href):
             urls.add(full_url)
-        elif builder == "rentals_ca" and re.search(r"/[a-z\-]+/[a-z0-9\-]+-id\d+", href):
-            # Explicit listing ID format: /toronto/building-name-id123456
-            urls.add(full_url)
-        elif builder == "rentals_ca" and re.search(r"/[a-z\-]+/\d+[a-z\-]", href):
-            # Address format: /toronto/55-oakmount-rd, /toronto/1101-bay
-            # Must start with a digit (street number).
-            # Exclude category pages (/toronto/2-bedrooms) and non-listing paths.
-            if not re.search(r"/\d+-bed(room)?s?\b", href):
-                if not re.search(r"/\d+-bath(room)?s?\b", href):
-                    if not re.search(r"/(manage|static|api|auth)\b", href):
-                        if not re.search(r"\.(js|css|png|jpg|svg|ico)$", href):
-                            urls.add(full_url)
         elif builder == "airbnb" and "/rooms/" in href:
             clean = re.sub(r"\?.*", "", full_url)
             urls.add(clean)

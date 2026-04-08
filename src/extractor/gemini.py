@@ -98,9 +98,11 @@ def _clean_html(html: str) -> str:
     # Collapse whitespace
     html = re.sub(r"\s+", " ", html)
 
-    # Truncate — 20k chars (~5k tokens) is ample for listing content after stripping
-    if len(html) > 20000:
-        html = html[:20000]
+    # Truncate — 30k chars (~7.5k tokens) per listing. With batch size 3 the total
+    # prompt is ~90k chars, well within the model's context but enough to capture
+    # amenity sections that appear deeper in the page (furnished, laundry, etc.).
+    if len(html) > 30000:
+        html = html[:30000]
 
     return html.strip()
 
@@ -148,7 +150,9 @@ Return only the JSON object. No explanation, no markdown fences."""
 # ── Batched extraction ────────────────────────────────────────────────────────
 # Bundle multiple listings into one API call to reduce request count.
 # Free tier: 10 RPM but ~1M TPM — we're request-limited, not token-limited.
-_BATCH_SIZE = 5
+# Keep at 3 (not 5) to avoid "lost in the middle" where the model misses fields
+# for listings buried deep in a large concatenated prompt.
+_BATCH_SIZE = 3
 
 
 def _build_batch_prompt(items: list[tuple[str, str, str]]) -> str:
@@ -302,8 +306,11 @@ async def _extract_batch(
     return listings
 
 
-async def _geocode_listing(listing: Listing, anchor_address: str) -> None:
-    """Geocode a listing's address and compute distance to anchor."""
+async def _geocode_listing(
+    listing: Listing,
+    anchor_coords: tuple[float, float] | None,
+) -> None:
+    """Geocode a listing's address and compute distance to the pre-geocoded anchor."""
     global _last_geocode_time
 
     if not listing.address or not listing.city:
@@ -330,28 +337,15 @@ async def _geocode_listing(listing: Listing, anchor_address: str) -> None:
     listing.latitude = location.latitude
     listing.longitude = location.longitude
 
-    # Calculate distance to anchor
-    if anchor_address:
-        async with _geocode_lock:
-            elapsed = time.time() - _last_geocode_time
-            if elapsed < 1.0:
-                await asyncio.sleep(1.0 - elapsed)
-            _last_geocode_time = time.time()
-
-            try:
-                loop = asyncio.get_event_loop()
-                anchor_loc = await loop.run_in_executor(None, geolocator.geocode, anchor_address)
-            except Exception:
-                return
-
-        if anchor_loc:
-            listing.distance_km = round(
-                geodesic(
-                    (listing.latitude, listing.longitude),
-                    (anchor_loc.latitude, anchor_loc.longitude),
-                ).km,
-                2,
-            )
+    # Compute distance using pre-geocoded anchor coords (no extra Nominatim call)
+    if anchor_coords:
+        listing.distance_km = round(
+            geodesic(
+                (listing.latitude, listing.longitude),
+                anchor_coords,
+            ).km,
+            2,
+        )
 
 
 async def extract_all(
@@ -403,11 +397,16 @@ async def extract_all(
 
     print(f"  Extracted {len(listings)} listings successfully")
 
-    # Geocode all listings
-    if config.search.anchor_address:
-        print(f"  Geocoding {len(listings)} listings (1/sec rate limit)...")
+    # Geocode all listings using pre-computed anchor coords (avoids re-geocoding
+    # the anchor once per listing, which was doubling the Nominatim call count).
+    anchor_coords: tuple[float, float] | None = None
+    if config.search.anchor_lat is not None and config.search.anchor_lng is not None:
+        anchor_coords = (config.search.anchor_lat, config.search.anchor_lng)
+
+    if anchor_coords or config.search.anchor_address:
+        print(f"  Geocoding {len(listings)} listings (1 req/sec)...")
         for listing in listings:
-            await _geocode_listing(listing, config.search.anchor_address)
+            await _geocode_listing(listing, anchor_coords)
 
     # Deduplicate by raw_html_hash
     seen_hashes: set[str] = set()
