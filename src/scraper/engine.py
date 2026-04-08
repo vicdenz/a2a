@@ -25,25 +25,39 @@ async def _extract_listing_urls(html: str, site: SiteConfig) -> list[str]:
 
         if builder == "kijiji" and "/v-" in href:
             urls.add(full_url)
-        elif builder == "craigslist" and "/apa/d/" in href:
+        elif builder == "craigslist" and re.search(r"/apa/d/", href):
             urls.add(full_url)
-        elif builder == "rentals_ca" and re.search(r"/[a-z\-]+/\d+", href):
+        elif builder == "craigslist" and re.search(r"/apa/\d{8,}", href):
             urls.add(full_url)
-        elif builder == "padmapper" and "/pad/" in href:
+        elif builder == "craigslist" and re.search(r"craigslist\.org/\w+/\w+/\d{8,}", href):
             urls.add(full_url)
-        elif builder == "apartments_com" and re.search(r"/[a-z\-]+/[a-z0-9]+/?$", href):
-            # Skip navigation/category links
-            if "/apartments/" not in href and len(href.split("/")) >= 4:
-                urls.add(full_url)
-        elif builder == "zillow" and re.search(r"/homedetails/|/b/", href):
+        elif builder == "rentals_ca" and re.search(r"/[a-z\-]+/[a-z0-9\-]+-id\d+", href):
+            # Explicit listing ID format: /toronto/building-name-id123456
             urls.add(full_url)
+        elif builder == "rentals_ca" and re.search(r"/[a-z\-]+/\d+[a-z\-]", href):
+            # Address format: /toronto/55-oakmount-rd, /toronto/1101-bay
+            # Must start with a digit (street number).
+            # Exclude category pages (/toronto/2-bedrooms) and non-listing paths.
+            if not re.search(r"/\d+-bed(room)?s?\b", href):
+                if not re.search(r"/\d+-bath(room)?s?\b", href):
+                    if not re.search(r"/(manage|static|api|auth)\b", href):
+                        if not re.search(r"\.(js|css|png|jpg|svg|ico)$", href):
+                            urls.add(full_url)
         elif builder == "airbnb" and "/rooms/" in href:
             clean = re.sub(r"\?.*", "", full_url)
             urls.add(clean)
-        elif builder == "uoft_housing" and "/listing/" in href:
-            urls.add(full_url)
         elif builder == "facebook_marketplace" and "/marketplace/item/" in href:
             urls.add(full_url)
+
+    # Debug: if no URLs found, log sample hrefs to help diagnose pattern issues
+    if not urls and all_hrefs:
+        sample = [h for h in all_hrefs if h.startswith("/") or site.base_url in h][:10]
+        if sample:
+            print(f"    DEBUG: No listing URLs matched. Sample hrefs from {site.name}:")
+            for h in sample:
+                print(f"      {h[:120]}")
+        else:
+            print(f"    DEBUG: {len(all_hrefs)} hrefs found but none match site domain. Page may be JS-rendered.")
 
     return list(urls)
 
@@ -79,7 +93,7 @@ async def scrape_all(config: AppConfig) -> list[tuple[str, str, str]]:
             search_urls = build_search_urls(site, config.search)
             print(f"  Search pages: {len(search_urls)}")
 
-            # Collect listing URLs from search pages
+            # Standard flow: collect listing URLs from search pages, then fetch each
             listing_urls: list[str] = []
             for search_url in search_urls:
                 if len(listing_urls) >= config.scraping.max_listings_per_site:

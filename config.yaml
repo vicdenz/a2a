@@ -1,78 +1,58 @@
 # ─────────────────────────────────────────────
-# APARTMENT FINDER — USER CONFIGURATION
+# a2a — USER CONFIGURATION
 # Edit this file to control the entire pipeline.
 # ─────────────────────────────────────────────
 
-# ── Claude AI Settings ────────────────────────
+# ── Gemini AI Settings ────────────────────────
+# Free-tier limits (as of 2026-04):
+#   gemini-3.1-flash-lite-preview — 15 RPM, 250K TPM, 500 RPD  ← best free option
+#   gemini-2.5-flash-lite         — 10 RPM, 250K TPM,  20 RPD  ← too low for production
 ai:
-  model: "claude-sonnet-4-6"
-  max_tokens: 4096
-  temperature: 0
+    model: "gemini-3.1-flash-lite-preview"
+    max_tokens: 8192
+    temperature: 0
 
 # ── Scraping Settings ─────────────────────────
 scraping:
-  headless: true
-  request_delay_ms: 2000
-  max_listings_per_site: 50
-  max_retries: 3
-  proxies: []
+    headless: true
+    request_delay_ms: 1000
+    # Set to 50+ for production runs; keep at 10 for faster testing.
+    max_listings_per_site: 50
+    max_retries: 3
+    proxies: []
 
 # ── Websites to Scrape ────────────────────────
 websites:
-  - name: "Kijiji"
-    enabled: true
-    base_url: "https://www.kijiji.ca"
-    url_builder: "kijiji"
-    strategy: "crawlee"
+    - name: "Kijiji"
+      enabled: true # working
+      base_url: "https://www.kijiji.ca"
+      url_builder: "kijiji"
+      strategy: "crawlee"
 
-  - name: "Craigslist Toronto"
-    enabled: true
-    base_url: "https://toronto.craigslist.org"
-    url_builder: "craigslist"
-    strategy: "crawlee"
+    - name: "Craigslist Toronto"
+      enabled: true
+      base_url: "https://toronto.craigslist.org"
+      url_builder: "craigslist"
+      strategy: "crawlee"
 
-  - name: "Rentals.ca"
-    enabled: true
-    base_url: "https://rentals.ca"
-    url_builder: "rentals_ca"
-    strategy: "crawlee"
+    - name: "Rentals.ca"
+      enabled: true # working
+      base_url: "https://rentals.ca"
+      url_builder: "rentals_ca"
+      strategy: "crawlee"
 
-  - name: "PadMapper"
-    enabled: true
-    base_url: "https://www.padmapper.com"
-    url_builder: "padmapper"
-    strategy: "camoufox"
+    - name: "Airbnb (Monthly Stays)"
+      enabled: true
+      base_url: "https://www.airbnb.ca"
+      url_builder: "airbnb"
+      strategy: "zendriver"
 
-  - name: "Apartments.com"
-    enabled: true
-    base_url: "https://www.apartments.com"
-    url_builder: "apartments_com"
-    strategy: "camoufox"
-
-  - name: "Zillow"
-    enabled: true
-    base_url: "https://www.zillow.com"
-    url_builder: "zillow"
-    strategy: "camoufox"
-
-  - name: "Airbnb (Monthly Stays)"
-    enabled: true
-    base_url: "https://www.airbnb.ca"
-    url_builder: "airbnb"
-    strategy: "zendriver"
-
-  - name: "UofT Off-Campus Housing"
-    enabled: true
-    base_url: "https://housing.utoronto.ca"
-    url_builder: "uoft_housing"
-    strategy: "crawlee"
-
-  - name: "Facebook Marketplace"
-    enabled: false
-    base_url: "https://www.facebook.com"
-    url_builder: "facebook_marketplace"
-    strategy: "camoufox"
-    cookies: []
+    - name: "Facebook Marketplace"
+      enabled: false # requires manually exporting session cookies from a logged-in browser
+      base_url: "https://www.facebook.com"
+      url_builder: "facebook_marketplace"
+      strategy: "camoufox"
+      cookies: []
 
 # ─────────────────────────────────────────────
 # SEARCH PARAMETERS
@@ -81,28 +61,30 @@ websites:
 # ─────────────────────────────────────────────
 
 search:
-  # Location
-  city: ""                           # e.g. "Toronto"
-  neighborhood: ""                   # e.g. "Annex, Kensington, Little Portugal"
-  anchor_address: ""                 # e.g. "27 King's College Circle, Toronto, ON"
-  max_distance_km: null              # e.g. 3
+    # Location
+    city: "Toronto"
+    # Scrapers search city-wide then filter by radius around anchor_address.
+    # neighborhood is only used for preference scoring, not URL filtering.
+    neighborhood: "Yorkville"
+    anchor_address: "27 King's College Circle, Toronto, ON"
+    max_distance_km: 4 # radius in km around anchor_address used for both scraping and hard filter
 
-  # Dates
-  move_in_date: ""                   # e.g. "2026-09-01"
-  lease_duration_months: null        # e.g. 8
+    # Dates
+    move_in_date: "2026-09-01" # e.g. "2026-09-01"
+    lease_duration_months: 8 # e.g. 8
 
-  # Unit Type
-  min_bedrooms: null                 # e.g. 1
-  max_bedrooms: null                 # e.g. 2
-  min_bathrooms: null                # e.g. 1
-  unit_types: []                     # e.g. ["apartment", "condo", "basement", "house"]
+    # Unit Type
+    min_bedrooms: 2 # e.g. 1
+    max_bedrooms: 2 # e.g. 2
+    min_bathrooms: 1 # e.g. 1
+    unit_types: ["apartment", "condo"] # e.g. ["apartment", "condo", "basement", "house"]
 
-  # Budget
-  max_monthly_rent: null             # e.g. 2200 (CAD)
-  min_monthly_rent: null             # e.g. 800
+    # Budget
+    max_monthly_rent: 3000 # e.g. 2200 (CAD)
+    min_monthly_rent: 2000 # e.g. 800
 
-  # Size
-  min_sqft: null                     # e.g. 400
+    # Size
+    min_sqft: null # e.g. 400
 
 # ─────────────────────────────────────────────
 # HARD REQUIREMENTS
@@ -111,86 +93,97 @@ search:
 # ─────────────────────────────────────────────
 
 requirements:
-  max_monthly_rent: null
-  min_bedrooms: null
-  max_distance_km: null
-  must_be_furnished: null
-  must_allow_pets: null
-  must_have_laundry: null
-  must_have_parking: null
-  short_term_ok: true
+    max_monthly_rent: 3200
+    min_bedrooms: 2
+    max_distance_km: 4
+    must_be_furnished: true
+    must_allow_pets: null
+    must_have_laundry: true
+    must_have_parking: null
+    short_term_ok: true
+    # Drop listings outside these neighborhoods (case-insensitive, substring match).
+    # Leave empty [] to allow all neighborhoods (recommended — use max_distance_km instead).
+    # AI-extracted neighborhood names are unreliable so this filter can be aggressive.
+    allowed_neighborhoods: []
 
 # ─────────────────────────────────────────────
 # PREFERENCES (Weighted Scoring)
 # ─────────────────────────────────────────────
 
 preferences:
-  - name: "Close to UofT"
-    enabled: true
-    weight: 10
-    description: "Prefer listings closer to anchor_address"
-    type: "distance"
+    - name: "Yorkville neighbourhood"
+      enabled: true
+      weight: 10
+      description: "Prefer listings in Yorkville specifically"
+      type: "neighborhood_match"
+      values: ["Yorkville", "Bloor-Yorkville"]
 
-  - name: "Lower rent"
-    enabled: true
-    weight: 8
-    description: "Prefer listings with lower monthly rent"
-    type: "price_asc"
+    - name: "Close to UofT"
+      enabled: true
+      weight: 9
+      description: "Prefer listings closer to anchor_address"
+      type: "distance"
 
-  - name: "Furnished"
-    enabled: true
-    weight: 6
-    description: "Prefer furnished units"
-    type: "boolean_field"
-    field: "furnished"
+    - name: "Lower rent"
+      enabled: false
+      weight: 7
+      description: "Prefer listings with lower monthly rent"
+      type: "price_asc"
 
-  - name: "In-unit laundry"
-    enabled: true
-    weight: 5
-    description: "Prefer in-unit washer/dryer"
-    type: "boolean_field"
-    field: "laundry_in_unit"
+    - name: "Furnished"
+      enabled: true
+      weight: 8
+      description: "Prefer furnished units"
+      type: "boolean_field"
+      field: "furnished"
 
-  - name: "Utilities included"
-    enabled: true
-    weight: 4
-    description: "Prefer rent that includes heat/hydro/water"
-    type: "boolean_field"
-    field: "utilities_included"
+    - name: "In-unit laundry"
+      enabled: true
+      weight: 10
+      description: "Prefer in-unit washer/dryer"
+      type: "boolean_field"
+      field: "laundry_in_unit"
 
-  - name: "Parking included"
-    enabled: false
-    weight: 3
-    description: "Prefer listings with parking"
-    type: "boolean_field"
-    field: "parking_included"
+    - name: "Utilities included"
+      enabled: true
+      weight: 4
+      description: "Prefer rent that includes heat/hydro/water"
+      type: "boolean_field"
+      field: "utilities_included"
 
-  - name: "Pets allowed"
-    enabled: false
-    weight: 3
-    description: "Prefer pet-friendly listings"
-    type: "boolean_field"
-    field: "pets_allowed"
+    - name: "Parking included"
+      enabled: false
+      weight: 1
+      description: "Prefer listings with parking"
+      type: "boolean_field"
+      field: "parking_included"
 
-  - name: "Balcony or outdoor space"
-    enabled: false
-    weight: 2
-    description: "Prefer units with a balcony, terrace, or yard"
-    type: "boolean_field"
-    field: "outdoor_space"
+    - name: "Pets allowed"
+      enabled: false
+      weight: 1
+      description: "Prefer pet-friendly listings"
+      type: "boolean_field"
+      field: "pets_allowed"
 
-  - name: "Gym / fitness center"
-    enabled: false
-    weight: 2
-    description: "Prefer buildings with a gym"
-    type: "boolean_field"
-    field: "gym"
+    - name: "Balcony or outdoor space"
+      enabled: true
+      weight: 6
+      description: "Prefer units with a balcony, terrace, or yard"
+      type: "boolean_field"
+      field: "outdoor_space"
+
+    - name: "Gym / fitness center"
+      enabled: true
+      weight: 8
+      description: "Prefer buildings with a gym"
+      type: "boolean_field"
+      field: "gym"
 
 # ── Output Settings ───────────────────────────
 output:
-  directory: "./output"
-  formats:
-    - "html"
-    - "json"
-    - "csv"
-  open_html_on_complete: true
+    directory: "./output"
+    formats:
+        - "html"
+        - "json"
+        - "csv"
+    open_html_on_complete: true

@@ -12,8 +12,19 @@ def filter_listings(listings: list[Listing], requirements: RequirementsConfig) -
     for listing in listings:
         dropped = False
 
+        # allowed_neighborhoods — if set, drop listings whose neighborhood
+        # is known but doesn't match any of the allowed values (case-insensitive).
+        # Listings with unknown neighborhood are kept (benefit of the doubt).
+        if requirements.allowed_neighborhoods:
+            allowed = [n.lower() for n in requirements.allowed_neighborhoods]
+            if listing.neighborhood is not None:
+                listing_hood = listing.neighborhood.lower()
+                if not any(a in listing_hood or listing_hood in a for a in allowed):
+                    drop_counts["allowed_neighborhoods"] = drop_counts.get("allowed_neighborhoods", 0) + 1
+                    dropped = True
+
         # max_monthly_rent — drop if missing or exceeds
-        if requirements.max_monthly_rent is not None:
+        if not dropped and requirements.max_monthly_rent is not None:
             if listing.monthly_rent is None or listing.monthly_rent > requirements.max_monthly_rent:
                 drop_counts["max_monthly_rent"] = drop_counts.get("max_monthly_rent", 0) + 1
                 dropped = True
@@ -70,5 +81,15 @@ def filter_listings(listings: list[Listing], requirements: RequirementsConfig) -
     print(f"  Filtered: {len(passed)} passed, {total_dropped} dropped")
     for rule, count in sorted(drop_counts.items()):
         print(f"    {rule}: {count} dropped")
+
+    # Show distance breakdown for passed listings
+    if passed and requirements.max_distance_km is not None:
+        with_dist = [(l.distance_km, l.neighborhood or l.address or l.url[:50]) for l in passed if l.distance_km is not None]
+        no_dist = [l for l in passed if l.distance_km is None]
+        if with_dist:
+            with_dist.sort()
+            print(f"  Distance range of passed listings: {with_dist[0][0]:.1f}–{with_dist[-1][0]:.1f} km")
+        if no_dist:
+            print(f"  Warning: {len(no_dist)} passed listing(s) have no distance (geocoding failed)")
 
     return passed

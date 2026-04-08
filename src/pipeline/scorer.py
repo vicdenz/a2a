@@ -60,6 +60,16 @@ def score_and_rank(
                     if val is True:
                         points = pref.weight
 
+            elif pref.type == "neighborhood_match":
+                # Full points if listing's neighborhood matches any preferred value.
+                # Case-insensitive substring match (e.g. "Yorkville" matches "Bloor-Yorkville").
+                # No points if neighborhood unknown — benefit of the doubt already handled by
+                # the distance scorer which rewards proximity to the anchor.
+                if pref.values and listing.neighborhood is not None:
+                    hood = listing.neighborhood.lower()
+                    if any(v.lower() in hood or hood in v.lower() for v in pref.values):
+                        points = pref.weight
+
             breakdown[pref.name] = round(points, 2)
             total += points
 

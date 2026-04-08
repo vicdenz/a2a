@@ -41,6 +41,8 @@ class SearchConfig(BaseModel):
     city: str = ""
     neighborhood: str = ""
     anchor_address: str = ""
+    anchor_lat: float | None = None   # geocoded at startup from anchor_address
+    anchor_lng: float | None = None   # geocoded at startup from anchor_address
     max_distance_km: float | None = None
     move_in_date: str = ""
     lease_duration_months: int | None = None
@@ -62,6 +64,7 @@ class RequirementsConfig(BaseModel):
     must_have_laundry: bool | None = None
     must_have_parking: bool | None = None
     short_term_ok: bool = True
+    allowed_neighborhoods: list[str] = Field(default_factory=list)
 
 
 class PreferenceConfig(BaseModel):
@@ -71,6 +74,7 @@ class PreferenceConfig(BaseModel):
     description: str
     type: str
     field: str | None = None
+    values: list[str] = Field(default_factory=list)  # used by neighborhood_match type
 
 
 class OutputConfig(BaseModel):
@@ -87,7 +91,7 @@ class AppConfig(BaseModel):
     requirements: RequirementsConfig
     preferences: list[PreferenceConfig]
     output: OutputConfig
-    anthropic_api_key: str
+    gemini_api_key: str
 
 
 def load_config(config_path: str = "config.yaml") -> AppConfig:
@@ -100,9 +104,9 @@ def load_config(config_path: str = "config.yaml") -> AppConfig:
     with open(path) as f:
         raw = yaml.safe_load(f)
 
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    api_key = os.environ.get("GEMINI_API_KEY", "")
     if not api_key:
-        raise ValueError("ANTHROPIC_API_KEY not set in .env or environment")
+        raise ValueError("GEMINI_API_KEY not set in .env or environment")
 
     return AppConfig(
         ai=AIConfig(**raw["ai"]),
@@ -112,5 +116,5 @@ def load_config(config_path: str = "config.yaml") -> AppConfig:
         requirements=RequirementsConfig(**raw["requirements"]),
         preferences=[PreferenceConfig(**p) for p in raw["preferences"]],
         output=OutputConfig(**raw["output"]),
-        anthropic_api_key=api_key,
+        gemini_api_key=api_key,
     )

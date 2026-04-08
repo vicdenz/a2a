@@ -118,7 +118,7 @@ class ZendriverStrategy(ScraperStrategy):
     async def close(self) -> None:
         if self._browser:
             try:
-                self._browser.stop()
+                await self._browser.stop()
             except Exception:
                 pass
             self._browser = None

@@ -5,24 +5,46 @@ from urllib.parse import quote, urlencode
 from src.config import SearchConfig, SiteConfig
 
 
+# ── Kijiji ────────────────────────────────────────────────────────────────────
+# URL format: /b-apartments-condos/{city-slug}/page-{N}/c37l{location_code}
+# Filters: maxPrice/minPrice as query params, bedrooms via path attribute codes.
+# Toronto slug is "city-of-toronto", location code 1700273.
+
+_KIJIJI_CITY_SLUGS: dict[str, tuple[str, str]] = {
+    # city name -> (url slug, location code)
+    "toronto": ("city-of-toronto", "1700273"),
+    "ottawa": ("ottawa", "1700185"),
+    "vancouver": ("vancouver", "1700287"),
+    "montreal": ("ville-de-montreal", "1700281"),
+    "calgary": ("calgary", "1700199"),
+    "edmonton": ("edmonton", "1700203"),
+}
+
+
 def _kijiji(search: SearchConfig) -> list[str]:
-    city = search.city.lower().replace(" ", "-") if search.city else "toronto"
-    base = f"https://www.kijiji.ca/b-apartments-condos/{city}"
+    city_key = (search.city or "Toronto").lower()
+    slug, loc_code = _KIJIJI_CITY_SLUGS.get(city_key, ("city-of-toronto", "1700273"))
+
+    # Build the category+attribute suffix
+    suffix = f"c37l{loc_code}"
+
     params: dict[str, str] = {}
     if search.max_monthly_rent is not None:
-        params["price"] = f"__{int(search.max_monthly_rent)}"
-    if search.min_bedrooms is not None:
-        params["bedrooms"] = str(search.min_bedrooms)
-    query = urlencode(params) if params else ""
+        params["maxPrice"] = str(int(search.max_monthly_rent))
+    if search.min_monthly_rent is not None:
+        params["minPrice"] = str(int(search.min_monthly_rent))
+
     urls = []
     for page in range(1, 4):
         page_part = f"/page-{page}" if page > 1 else ""
-        url = f"{base}{page_part}/k0c37l1700273"
-        if query:
-            url += f"?{query}"
+        url = f"https://www.kijiji.ca/b-apartments-condos/{slug}{page_part}/{suffix}"
+        if params:
+            url += f"?{urlencode(params)}"
         urls.append(url)
     return urls
 
+
+# ── Craigslist ────────────────────────────────────────────────────────────────
 
 def _craigslist(search: SearchConfig) -> list[str]:
     base = "https://toronto.craigslist.org/search/apa"
@@ -37,6 +59,13 @@ def _craigslist(search: SearchConfig) -> list[str]:
         params["max_bedrooms"] = str(search.max_bedrooms)
     if search.min_sqft is not None:
         params["minSqft"] = str(search.min_sqft)
+    # Radius search: Craigslist supports lat/lon + search_distance (in miles)
+    if search.anchor_lat is not None and search.anchor_lng is not None:
+        params["lat"] = f"{search.anchor_lat:.6f}"
+        params["lon"] = f"{search.anchor_lng:.6f}"
+        if search.max_distance_km is not None:
+            miles = search.max_distance_km / 1.60934
+            params["search_distance"] = f"{miles:.1f}"
     urls = []
     for page in range(3):
         p = dict(params)
@@ -46,6 +75,8 @@ def _craigslist(search: SearchConfig) -> list[str]:
         urls.append(url)
     return urls
 
+
+# ── Rentals.ca ────────────────────────────────────────────────────────────────
 
 def _rentals_ca(search: SearchConfig) -> list[str]:
     city = search.city.lower().replace(" ", "-") if search.city else "toronto"
@@ -67,55 +98,8 @@ def _rentals_ca(search: SearchConfig) -> list[str]:
     return urls
 
 
-def _padmapper(search: SearchConfig) -> list[str]:
-    city = search.city.lower().replace(" ", "-") if search.city else "toronto"
-    base = f"https://www.padmapper.com/apartments/{city}-on"
-    params: dict[str, str] = {}
-    if search.max_monthly_rent is not None:
-        params["max-price"] = str(int(search.max_monthly_rent))
-    if search.min_monthly_rent is not None:
-        params["min-price"] = str(int(search.min_monthly_rent))
-    if search.min_bedrooms is not None:
-        params["min-bedrooms"] = str(search.min_bedrooms)
-    url = f"{base}?{urlencode(params)}" if params else base
-    return [url]
-
-
-def _apartments_com(search: SearchConfig) -> list[str]:
-    city = search.city.lower().replace(" ", "-") if search.city else "toronto"
-    base = f"https://www.apartments.com/{city}-on"
-    params: dict[str, str] = {}
-    if search.min_bedrooms is not None:
-        params["bb"] = str(search.min_bedrooms)
-    urls = []
-    for page in range(1, 4):
-        page_part = f"/{page}" if page > 1 else ""
-        url = f"{base}{page_part}"
-        if params:
-            url += f"?{urlencode(params)}"
-        urls.append(url)
-    return urls
-
-
-def _zillow(search: SearchConfig) -> list[str]:
-    city = search.city.lower().replace(" ", "-") if search.city else "toronto"
-    base = f"https://www.zillow.com/{city}-on/rentals"
-    params: dict[str, str] = {}
-    if search.max_monthly_rent is not None:
-        params["price_max"] = str(int(search.max_monthly_rent))
-    if search.min_monthly_rent is not None:
-        params["price_min"] = str(int(search.min_monthly_rent))
-    if search.min_bedrooms is not None:
-        params["beds_min"] = str(search.min_bedrooms)
-    urls = []
-    for page in range(1, 4):
-        p = dict(params)
-        if page > 1:
-            p["currentPage"] = str(page)
-        url = f"{base}/?{urlencode(p)}" if p else base
-        urls.append(url)
-    return urls
-
+# ── Airbnb ────────────────────────────────────────────────────────────────────
+# Pagination via items_offset query param (increments of 20).
 
 def _airbnb(search: SearchConfig) -> list[str]:
     base = "https://www.airbnb.ca/s"
@@ -135,7 +119,6 @@ def _airbnb(search: SearchConfig) -> list[str]:
     if search.move_in_date:
         params["checkin"] = search.move_in_date
     if search.move_in_date and search.lease_duration_months:
-        # Airbnb uses checkout date
         from datetime import datetime, timedelta
         try:
             dt = datetime.strptime(search.move_in_date, "%Y-%m-%d")
@@ -143,14 +126,18 @@ def _airbnb(search: SearchConfig) -> list[str]:
             params["checkout"] = checkout.strftime("%Y-%m-%d")
         except ValueError:
             pass
-    url = f"{base}/{location}/homes?{urlencode(params)}"
-    return [url]
+
+    urls = []
+    for page in range(3):
+        p = dict(params)
+        if page > 0:
+            p["items_offset"] = str(page * 20)
+        url = f"{base}/{location}/homes?{urlencode(p)}"
+        urls.append(url)
+    return urls
 
 
-def _uoft_housing(search: SearchConfig) -> list[str]:
-    base = "https://housing.utoronto.ca/all-listings"
-    return [base]
-
+# ── Facebook Marketplace ─────────────────────────────────────────────────────
 
 def _facebook_marketplace(search: SearchConfig) -> list[str]:
     city = search.city or "Toronto"
@@ -166,15 +153,14 @@ def _facebook_marketplace(search: SearchConfig) -> list[str]:
     return [url]
 
 
+# ── Registry ─────────────────────────────────────────────────────────────────
+
 URL_BUILDERS: dict[str, callable] = {
     "kijiji": _kijiji,
     "craigslist": _craigslist,
     "rentals_ca": _rentals_ca,
-    "padmapper": _padmapper,
-    "apartments_com": _apartments_com,
-    "zillow": _zillow,
+
     "airbnb": _airbnb,
-    "uoft_housing": _uoft_housing,
     "facebook_marketplace": _facebook_marketplace,
 }
 
