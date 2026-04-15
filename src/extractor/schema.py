@@ -58,6 +58,10 @@ class Listing(BaseModel):
     score: float | None = None
     score_breakdown: dict | None = None
 
+    # Filtering (populated by pipeline)
+    passed_filter: bool | None = None
+    filter_reason: str | None = None
+
     # Meta
     scraped_at: datetime = Field(default_factory=datetime.now)
     raw_html_hash: str | None = None

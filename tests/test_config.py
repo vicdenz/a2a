@@ -28,18 +28,11 @@ def _write_config(path, overrides=None):
         ],
         "search": {
             "city": "Toronto",
-            "neighborhood": "",
             "anchor_address": "",
             "max_distance_km": None,
             "move_in_date": "",
             "lease_duration_months": None,
-            "min_bedrooms": None,
-            "max_bedrooms": None,
-            "min_bathrooms": None,
-            "unit_types": [],
             "max_monthly_rent": None,
-            "min_monthly_rent": None,
-            "min_sqft": None,
         },
         "requirements": {
             "max_monthly_rent": None,

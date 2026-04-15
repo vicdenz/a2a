@@ -5,9 +5,9 @@ from src.extractor.schema import Listing
 
 
 def filter_listings(listings: list[Listing], requirements: RequirementsConfig) -> list[Listing]:
-    """Apply hard requirement filters. Listings failing ANY enabled filter are dropped."""
-    passed: list[Listing] = []
+    """Tag listings with passed_filter / filter_reason. Returns ALL listings unchanged in count."""
     drop_counts: dict[str, int] = {}
+    passed_count = 0
 
     for listing in listings:
         drop_reason: str | None = None
@@ -69,20 +69,24 @@ def filter_listings(listings: list[Listing], requirements: RequirementsConfig) -
                 drop_reason = "short_term_ok (explicitly not short-term)"
 
         if drop_reason is None:
-            passed.append(listing)
+            listing.passed_filter = True
+            listing.filter_reason = None
+            passed_count += 1
         else:
+            listing.passed_filter = False
+            listing.filter_reason = drop_reason
             label = listing.address or listing.url[:60]
-            print(f"  DROPPED [{listing.source}] {label[:60]} — {drop_reason}")
+            print(f"  FILTERED [{listing.source}] {label[:60]} — {drop_reason}")
             drop_counts[drop_reason.split(" (")[0]] = drop_counts.get(drop_reason.split(" (")[0], 0) + 1
 
     # Log filter summary
-    total_dropped = len(listings) - len(passed)
-    print(f"  Filtered: {len(passed)} passed, {total_dropped} dropped")
+    print(f"  Filtered: {passed_count} passed, {len(listings) - passed_count} failed (kept for HTML toggle)")
     for rule, count in sorted(drop_counts.items()):
-        print(f"    {rule}: {count} dropped")
+        print(f"    {rule}: {count} failed")
 
     # Show distance breakdown for passed listings
-    if passed and requirements.max_distance_km is not None:
+    if passed_count and requirements.max_distance_km is not None:
+        passed = [l for l in listings if l.passed_filter]
         with_dist = [(l.distance_km, l.neighborhood or l.address or l.url[:50]) for l in passed if l.distance_km is not None]
         no_dist = [l for l in passed if l.distance_km is None]
         if with_dist:
@@ -91,4 +95,4 @@ def filter_listings(listings: list[Listing], requirements: RequirementsConfig) -
         if no_dist:
             print(f"  Warning: {len(no_dist)} passed listing(s) have no distance (geocoding failed)")
 
-    return passed
+    return listings

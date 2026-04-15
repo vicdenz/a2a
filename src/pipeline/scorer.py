@@ -76,10 +76,11 @@ def score_and_rank(
         listing.score = round(total, 2)
         listing.score_breakdown = breakdown
 
-    # Sort: by score descending, then null-price listings last
+    # Sort: passed_filter listings first, then by score desc, then null-price last
     listings.sort(
         key=lambda l: (
-            l.monthly_rent is not None,  # False (null price) sorts before True
+            l.passed_filter is True,
+            l.monthly_rent is not None,
             l.score or 0,
         ),
         reverse=True,

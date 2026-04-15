@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from urllib.parse import quote, urlencode
 
+from geopy.distance import geodesic
+
 from src.config import SearchConfig, SiteConfig
 
 
@@ -73,23 +75,89 @@ def _craigslist(search: SearchConfig) -> list[str]:
 
 
 # ── Rentals.ca ────────────────────────────────────────────────────────────────
+# Rentals.ca serves geographically-tight listings on neighbourhood-slug URLs
+# (e.g. /toronto/yorkville). City-level URLs return broad, non-centered results
+# even with bbox/h3 params. To scope results to the anchor, we scrape every
+# neighbourhood whose centroid is within _RENTALS_CA_ADJACENCY_KM of the anchor
+# (i.e. truly adjacent, not "anywhere in max_distance_km radius"). Falls back
+# to the single closest slug if none are within the adjacency threshold.
+
+# Only neighbourhoods whose centroid is within this many km of the anchor are
+# scraped. Distances larger than this aren't "adjacent" — they'd include
+# far-away neighbourhoods that happen to fall within max_distance_km.
+_RENTALS_CA_ADJACENCY_KM = 1.5
+
+_RENTALS_CA_NEIGHBOURHOODS: dict[str, list[tuple[str, float, float]]] = {
+    # city: [(slug, lat, lng), ...]
+    "toronto": [
+        ("trinity-bellwoods", 43.6474, -79.4137),
+        ("yonge-and-eglinton", 43.7064, -79.3986),
+        ("the-annex", 43.6703, -79.4053),
+        ("liberty-village", 43.6391, -79.4200),
+        ("yonge-stclair", 43.6872, -79.3940),
+        ("high-park-north", 43.6600, -79.4650),
+        ("church-yonge-corridor", 43.6613, -79.3805),
+        ("midtown-toronto", 43.6970, -79.3957),
+        ("bay-street-corridor", 43.6550, -79.3840),
+        ("leslieville", 43.6631, -79.3345),
+        ("yorkville", 43.6707, -79.3928),
+        ("corktown", 43.6553, -79.3651),
+        ("south-riverdale", 43.6600, -79.3450),
+        ("financial-district", 43.6484, -79.3810),
+        ("moss-park", 43.6551, -79.3686),
+        ("mount-pleasant-west", 43.7035, -79.3895),
+        ("kensington-chinatown", 43.6542, -79.4006),
+        ("mount-pleasant-east", 43.7098, -79.3825),
+        ("the-beaches", 43.6692, -79.2963),
+        ("roncesvalles", 43.6475, -79.4483),
+    ],
+}
+
 
 def _rentals_ca(search: SearchConfig) -> list[str]:
     city = search.city.lower().replace(" ", "-") if search.city else "toronto"
-    base = f"https://rentals.ca/{city}"
-    # Only use max rent in URL — cast a broad net.
-    # Min rent and bedroom count are checked by the AI + requirements filter,
-    # so we don't exclude "1+den" units or budget finds at the URL level.
+    # Only use max rent — cast a broad net. Bedroom count, furnished, etc.
+    # are checked by the AI + requirements filter downstream.
     params: dict[str, str] = {}
     if search.max_monthly_rent is not None:
         params["rent_max"] = str(int(search.max_monthly_rent))
+
+    # Pick every neighbourhood whose centroid is within _RENTALS_CA_ADJACENCY_KM
+    # of the anchor. Sort by ascending distance so the closest come first.
+    slugs: list[str] = []
+    neighbourhoods = _RENTALS_CA_NEIGHBOURHOODS.get(city)
+    if (
+        neighbourhoods
+        and search.anchor_lat is not None
+        and search.anchor_lng is not None
+    ):
+        anchor = (search.anchor_lat, search.anchor_lng)
+        ranked = sorted(
+            ((slug, geodesic(anchor, (lat, lng)).km) for slug, lat, lng in neighbourhoods),
+            key=lambda x: x[1],
+        )
+        slugs = [slug for slug, dist in ranked if dist <= _RENTALS_CA_ADJACENCY_KM]
+        # Fallback: if no neighbourhood is within the adjacency threshold,
+        # use the single closest so we still return something.
+        if not slugs and ranked:
+            slugs = [ranked[0][0]]
+
+    if slugs:
+        bases = [f"https://rentals.ca/{city}/{slug}" for slug in slugs]
+    else:
+        bases = [f"https://rentals.ca/{city}"]
+
+    # Interleave: all neighbourhoods page 1, then all page 2, etc. The engine
+    # short-circuits once max_listings_per_site is reached, so this ordering
+    # guarantees we sample every adjacent neighbourhood before re-paginating.
     urls = []
     for page in range(1, 4):
-        p = dict(params)
-        if page > 1:
-            p["p"] = str(page)
-        url = f"{base}?{urlencode(p)}" if p else base
-        urls.append(url)
+        for base in bases:
+            p = dict(params)
+            if page > 1:
+                p["p"] = str(page)
+            url = f"{base}?{urlencode(p)}" if p else base
+            urls.append(url)
     return urls
 
 

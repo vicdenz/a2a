@@ -27,7 +27,7 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument(
         "-a", "--all",
         action="store_true",
-        help="Skip requirements filter — output every extracted listing regardless of filters.",
+        help="Mark all listings as passing the filter (skip filter logic entirely).",
     )
     p.add_argument(
         "-r", "--resume",
@@ -123,18 +123,22 @@ async def main(args: argparse.Namespace) -> None:
         print("\nNo listings could be extracted. Check Gemini API key and model.")
         return
 
-    # Step 3: Filter (skipped with --all)
+    # Step 3: Filter — tags listings with passed_filter (does NOT drop them)
     if args.all:
-        print(f"\n=== Filter skipped (--all) — keeping all {len(listings)} listings ===")
-        filtered = listings
+        print(f"\n=== Filter skipped (--all) — marking all {len(listings)} listings as passed ===")
+        for l in listings:
+            l.passed_filter = True
+            l.filter_reason = None
     else:
         print(f"\n=== Filtering {len(listings)} listings ===")
-        filtered = filter_listings(listings, config.requirements)
+        filter_listings(listings, config.requirements)
 
-    # Step 4: Score & rank
-    print(f"\n=== Scoring {len(filtered)} listings ===")
-    ranked = score_and_rank(filtered, config.preferences, config.search)
-    print(f"  Top score: {ranked[0].score if ranked else 'N/A'}")
+    # Step 4: Score & rank (all listings — passed are sorted first)
+    print(f"\n=== Scoring {len(listings)} listings ===")
+    ranked = score_and_rank(listings, config.preferences, config.search)
+    passed_count = sum(1 for l in ranked if l.passed_filter)
+    top_passed_score = next((l.score for l in ranked if l.passed_filter), None)
+    print(f"  Top passed score: {top_passed_score if top_passed_score is not None else 'N/A'}")
 
     # Step 5: Output
     print(f"\n=== Generating output ===")
@@ -146,7 +150,7 @@ async def main(args: argparse.Namespace) -> None:
         sites_count=len(enabled_sites),
     )
 
-    print(f"\n=== Done! {len(ranked)} listings in report ===")
+    print(f"\n=== Done! {passed_count} passed / {len(ranked)} total listings in report ===")
 
 
 if __name__ == "__main__":

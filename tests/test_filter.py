@@ -9,11 +9,18 @@ def _make_listing(**kwargs) -> Listing:
     return Listing(**defaults)
 
 
+def _passed(result: list[Listing]) -> list[Listing]:
+    return [l for l in result if l.passed_filter]
+
+
 def test_filter_no_requirements():
     reqs = RequirementsConfig()
     listings = [_make_listing(monthly_rent=2000), _make_listing(monthly_rent=3000)]
     result = filter_listings(listings, reqs)
+    # Always returns all listings now
     assert len(result) == 2
+    # Both pass with no requirements
+    assert all(l.passed_filter for l in result)
 
 
 def test_filter_max_rent():
@@ -21,11 +28,16 @@ def test_filter_max_rent():
     listings = [
         _make_listing(monthly_rent=1800),
         _make_listing(monthly_rent=2500),
-        _make_listing(monthly_rent=None),  # Dropped — missing rent
+        _make_listing(monthly_rent=None),  # Tagged as failed — missing rent
     ]
     result = filter_listings(listings, reqs)
-    assert len(result) == 1
-    assert result[0].monthly_rent == 1800
+    assert len(result) == 3
+    passed = _passed(result)
+    assert len(passed) == 1
+    assert passed[0].monthly_rent == 1800
+    # Failed listings should carry a reason
+    failed = [l for l in result if not l.passed_filter]
+    assert all(l.filter_reason for l in failed)
 
 
 def test_filter_min_bedrooms():
@@ -33,10 +45,11 @@ def test_filter_min_bedrooms():
     listings = [
         _make_listing(bedrooms=1),
         _make_listing(bedrooms=2),
-        _make_listing(bedrooms=None),  # Kept — benefit of the doubt
+        _make_listing(bedrooms=None),  # Pass — benefit of the doubt
     ]
     result = filter_listings(listings, reqs)
-    assert len(result) == 2
+    assert len(result) == 3
+    assert len(_passed(result)) == 2
 
 
 def test_filter_furnished():
@@ -44,10 +57,11 @@ def test_filter_furnished():
     listings = [
         _make_listing(furnished=True),
         _make_listing(furnished=False),
-        _make_listing(furnished=None),  # Kept — benefit of the doubt
+        _make_listing(furnished=None),  # Pass — benefit of the doubt
     ]
     result = filter_listings(listings, reqs)
-    assert len(result) == 2
+    assert len(result) == 3
+    assert len(_passed(result)) == 2
 
 
 def test_filter_distance():
@@ -55,22 +69,25 @@ def test_filter_distance():
     listings = [
         _make_listing(distance_km=1.5),
         _make_listing(distance_km=5.0),
-        _make_listing(distance_km=None),  # Dropped — missing distance
+        _make_listing(distance_km=None),  # Failed — missing distance
     ]
     result = filter_listings(listings, reqs)
-    assert len(result) == 1
-    assert result[0].distance_km == 1.5
+    assert len(result) == 3
+    passed = _passed(result)
+    assert len(passed) == 1
+    assert passed[0].distance_km == 1.5
 
 
 def test_filter_short_term():
     reqs = RequirementsConfig(short_term_ok=True)
     listings = [
         _make_listing(short_term_available=True),
-        _make_listing(short_term_available=False),  # Dropped
-        _make_listing(short_term_available=None),  # Kept
+        _make_listing(short_term_available=False),  # Failed
+        _make_listing(short_term_available=None),  # Pass
     ]
     result = filter_listings(listings, reqs)
-    assert len(result) == 2
+    assert len(result) == 3
+    assert len(_passed(result)) == 2
 
 
 def test_filter_combined():
@@ -81,5 +98,7 @@ def test_filter_combined():
         _make_listing(monthly_rent=1500, bedrooms=0.5),  # Fail bedrooms
     ]
     result = filter_listings(listings, reqs)
-    assert len(result) == 1
-    assert result[0].monthly_rent == 1500
+    assert len(result) == 3
+    passed = _passed(result)
+    assert len(passed) == 1
+    assert passed[0].monthly_rent == 1500

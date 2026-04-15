@@ -17,7 +17,7 @@ scraping:
     headless: true
     request_delay_ms: 1000
     # Set to 50+ for production runs; keep at 10 for faster testing.
-    max_listings_per_site: 10
+    max_listings_per_site: 15
     max_retries: 3
     proxies: []
 
@@ -30,19 +30,19 @@ websites:
       strategy: "crawlee"
 
     - name: "Craigslist Toronto"
-      enabled: true
+      enabled: true # working
       base_url: "https://toronto.craigslist.org"
       url_builder: "craigslist"
       strategy: "crawlee"
 
     - name: "Rentals.ca"
-      enabled: true # working
+      enabled: true 
       base_url: "https://rentals.ca"
       url_builder: "rentals_ca"
       strategy: "crawlee"
 
     - name: "Airbnb (Monthly Stays)"
-      enabled: true
+      enabled: false # poor results
       base_url: "https://www.airbnb.ca"
       url_builder: "airbnb"
       strategy: "zendriver"
@@ -63,7 +63,7 @@ websites:
 search:
     city: "Toronto"
     anchor_address: "27 King's College Circle, Toronto, ON"
-    max_distance_km: 4 # radius in km around anchor_address
+    max_distance_km: 2 # radius in km around anchor_address
     move_in_date: "2026-09-01"
     lease_duration_months: 8 # used by Airbnb to compute checkout date
     max_monthly_rent: 3200 # upper price cap injected into search URLs (CAD)
@@ -95,7 +95,7 @@ requirements:
 preferences:
     - name: "Yorkville neighbourhood"
       enabled: true
-      weight: 9
+      weight: 8
       description: "Prefer listings in Yorkville specifically"
       type: "neighborhood_match"
       values: ["Yorkville", "Bloor-Yorkville"]
@@ -113,13 +113,6 @@ preferences:
       type: "boolean_field"
       field: "laundry_in_unit"
 
-    - name: "Gym / fitness center"
-      enabled: true
-      weight: 8
-      description: "Prefer buildings with a gym"
-      type: "boolean_field"
-      field: "gym"
-
     - name: "Furnished"
       enabled: true
       weight: 9
@@ -127,19 +120,26 @@ preferences:
       type: "boolean_field"
       field: "furnished"
 
+    - name: "Utilities included"
+      enabled: true
+      weight: 4
+      description: "Prefer rent that includes heat/hydro/water"
+      type: "boolean_field"
+      field: "utilities_included"
+
     - name: "Balcony or outdoor space"
       enabled: true
-      weight: 3
+      weight: 2
       description: "Prefer units with a balcony, terrace, or yard"
       type: "boolean_field"
       field: "outdoor_space"
 
-    - name: "Utilities included"
-      enabled: true
-      weight: 2
-      description: "Prefer rent that includes heat/hydro/water"
+    - name: "Gym / fitness center"
+      enabled: false
+      weight: 7
+      description: "Prefer buildings with a gym"
       type: "boolean_field"
-      field: "utilities_included"
+      field: "gym"
 
     - name: "Lower rent"
       enabled: false
