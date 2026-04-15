@@ -12,15 +12,15 @@ def filter_listings(listings: list[Listing], requirements: RequirementsConfig) -
     for listing in listings:
         drop_reason: str | None = None
 
-        # allowed_neighborhoods — if set, drop listings whose neighborhood
+        # allowed_neighbourhoods — if set, drop listings whose neighbourhood
         # is known but doesn't match any of the allowed values (case-insensitive).
-        # Listings with unknown neighborhood are kept (benefit of the doubt).
-        if requirements.allowed_neighborhoods:
-            allowed = [n.lower() for n in requirements.allowed_neighborhoods]
-            if listing.neighborhood is not None:
-                listing_hood = listing.neighborhood.lower()
+        # Listings with unknown neighbourhood are kept (benefit of the doubt).
+        if requirements.allowed_neighbourhoods:
+            allowed = [n.lower() for n in requirements.allowed_neighbourhoods]
+            if listing.neighbourhood is not None:
+                listing_hood = listing.neighbourhood.lower()
                 if not any(a in listing_hood or listing_hood in a for a in allowed):
-                    drop_reason = "allowed_neighborhoods"
+                    drop_reason = "allowed_neighbourhoods"
 
         # max_monthly_rent — drop if missing or exceeds
         if drop_reason is None and requirements.max_monthly_rent is not None:
@@ -87,7 +87,7 @@ def filter_listings(listings: list[Listing], requirements: RequirementsConfig) -
     # Show distance breakdown for passed listings
     if passed_count and requirements.max_distance_km is not None:
         passed = [l for l in listings if l.passed_filter]
-        with_dist = [(l.distance_km, l.neighborhood or l.address or l.url[:50]) for l in passed if l.distance_km is not None]
+        with_dist = [(l.distance_km, l.neighbourhood or l.address or l.url[:50]) for l in passed if l.distance_km is not None]
         no_dist = [l for l in passed if l.distance_km is None]
         if with_dist:
             with_dist.sort()

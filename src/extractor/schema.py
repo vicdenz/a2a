@@ -13,7 +13,7 @@ class Listing(BaseModel):
 
     # Location
     address: str | None = None
-    neighborhood: str | None = None
+    neighbourhood: str | None = None
     city: str | None = None
     latitude: float | None = None
     longitude: float | None = None
@@ -71,7 +71,7 @@ class Listing(BaseModel):
 EXTRACTION_FIELDS: dict = {
     "listing_id": "string or null",
     "address": "string or null",
-    "neighborhood": "string or null",
+    "neighbourhood": "string or null",
     "city": "string or null",
     "title": "string or null",
     "description": "string or null — first 500 chars of listing description",

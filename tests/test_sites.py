@@ -1,6 +1,6 @@
 from urllib.parse import parse_qs, urlparse
 
-from src.config import SearchConfig, SiteConfig
+from src.config import RequirementsConfig, SearchConfig, SiteConfig
 from src.scraper.sites import build_search_urls
 
 
@@ -23,12 +23,12 @@ def test_rentals_ca_picks_adjacent_neighbourhoods():
         max_distance_km=4.0,
         max_monthly_rent=3200,
     )
-    urls = build_search_urls(_site("rentals_ca"), search)
+    groups = build_search_urls(_site("rentals_ca"), search)
 
-    # Extract unique slugs from the URL list
+    # One group per neighbourhood
     slugs = []
-    for u in urls:
-        parts = urlparse(u).path.strip("/").split("/")
+    for group in groups:
+        parts = urlparse(group[0]).path.strip("/").split("/")
         if len(parts) == 2:
             slugs.append(parts[1])
     unique_slugs = list(dict.fromkeys(slugs))
@@ -42,8 +42,8 @@ def test_rentals_ca_picks_adjacent_neighbourhoods():
     for far in ("the-beaches", "leslieville", "high-park-north", "yonge-and-eglinton", "roncesvalles"):
         assert far not in unique_slugs
 
-    # First URL has no ?p= (page 1), all use rent_max, no bbox/h3
-    parsed = urlparse(urls[0])
+    # First URL of first group has no ?p= (page 1), uses rent_max, no bbox/h3
+    parsed = urlparse(groups[0][0])
     params = parse_qs(parsed.query)
     assert params["rent_max"] == ["3200"]
     assert "bbox" not in params
@@ -51,26 +51,40 @@ def test_rentals_ca_picks_adjacent_neighbourhoods():
     assert "p" not in params
 
 
-def test_rentals_ca_interleaves_pages():
-    """Pages are interleaved so every neighbourhood is sampled before page 2."""
+def test_rentals_ca_user_provided_neighbourhoods_override():
+    """Explicit slugs in requirements take precedence over auto-pick."""
+    search = SearchConfig(
+        city="Toronto",
+        anchor_lat=43.6629,  # UofT — would auto-pick yorkville etc.
+        anchor_lng=-79.3957,
+        max_monthly_rent=3200,
+    )
+    reqs = RequirementsConfig(
+        rentals_ca_neighbourhoods=["the-beaches", "leslieville", "roncesvalles"]
+    )
+    groups = build_search_urls(_site("rentals_ca"), search, reqs)
+
+    # Order should match the user's list — one group per slug
+    assert len(groups) == 3
+    slugs = [urlparse(g[0]).path.strip("/").split("/")[-1] for g in groups]
+    assert slugs == ["the-beaches", "leslieville", "roncesvalles"]
+
+
+def test_rentals_ca_pagination_per_group():
+    """Each neighbourhood group has its own 3-page sequence."""
     search = SearchConfig(
         city="Toronto",
         anchor_lat=43.6629,
         anchor_lng=-79.3957,
         max_monthly_rent=3200,
     )
-    urls = build_search_urls(_site("rentals_ca"), search)
+    groups = build_search_urls(_site("rentals_ca"), search)
 
-    # Partition URLs by page: page 1 has no 'p=', page 2 has 'p=2', etc.
-    page1 = [u for u in urls if "p=" not in u]
-    page2 = [u for u in urls if "p=2" in u]
-    assert len(page1) >= 3  # multiple neighbourhoods
-    assert len(page2) == len(page1)  # same neighbourhoods repeated
-
-    # All page-1 URLs come before any page-2 URL in the emitted list
-    last_page1_idx = max(i for i, u in enumerate(urls) if "p=" not in u)
-    first_page2_idx = min(i for i, u in enumerate(urls) if "p=2" in u)
-    assert last_page1_idx < first_page2_idx
+    for group in groups:
+        assert len(group) == 3
+        assert "p=" not in group[0]
+        assert "p=2" in group[1]
+        assert "p=3" in group[2]
 
 
 def test_rentals_ca_distant_anchor_fallback_to_closest():
@@ -82,9 +96,10 @@ def test_rentals_ca_distant_anchor_fallback_to_closest():
         anchor_lng=-79.2000,
         max_monthly_rent=3000,
     )
-    urls = build_search_urls(_site("rentals_ca"), search)
-    slugs = {urlparse(u).path.strip("/").split("/")[-1] for u in urls}
-    # Exactly one slug — the fallback closest
+    groups = build_search_urls(_site("rentals_ca"), search)
+    slugs = {urlparse(g[0]).path.strip("/").split("/")[-1] for g in groups}
+    # Exactly one group — the fallback closest
+    assert len(groups) == 1
     assert len(slugs) == 1
 
 
@@ -96,27 +111,29 @@ def test_rentals_ca_anchor_inside_the_beaches():
         anchor_lng=-79.2963,
         max_monthly_rent=3000,
     )
-    urls = build_search_urls(_site("rentals_ca"), search)
-    slugs = {urlparse(u).path.strip("/").split("/")[-1] for u in urls}
+    groups = build_search_urls(_site("rentals_ca"), search)
+    slugs = {urlparse(g[0]).path.strip("/").split("/")[-1] for g in groups}
     assert "the-beaches" in slugs
 
 
 def test_rentals_ca_no_slug_without_coords():
-    """Without anchor coords, fall back to the city-level URL."""
+    """Without anchor coords, fall back to a single city-level group."""
     search = SearchConfig(city="Toronto", max_monthly_rent=3200)
-    urls = build_search_urls(_site("rentals_ca"), search)
+    groups = build_search_urls(_site("rentals_ca"), search)
 
-    parsed = urlparse(urls[0])
+    assert len(groups) == 1
+    parsed = urlparse(groups[0][0])
     assert parsed.path.strip("/") == "toronto"
     params = parse_qs(parsed.query)
     assert params["rent_max"] == ["3200"]
 
 
 def test_rentals_ca_pagination():
-    """Rentals.ca page 2+ should include p= param; without anchor, single city URL × 3 pages."""
+    """Without anchor coords, single city group × 3 pages."""
     search = SearchConfig(city="Toronto")
-    urls = build_search_urls(_site("rentals_ca"), search)
-    # No anchor coords → single city URL × 3 pages
+    groups = build_search_urls(_site("rentals_ca"), search)
+    assert len(groups) == 1
+    urls = groups[0]
     assert len(urls) == 3
     assert "p=" not in urls[0]
     assert "p=2" in urls[1]
@@ -131,8 +148,8 @@ def test_rentals_ca_only_price_filter():
         anchor_lng=-79.3957,
         max_monthly_rent=3200,
     )
-    urls = build_search_urls(_site("rentals_ca"), search)
-    parsed = urlparse(urls[0])
+    groups = build_search_urls(_site("rentals_ca"), search)
+    parsed = urlparse(groups[0][0])
     params = parse_qs(parsed.query)
     # Only rent_max allowed as a URL filter
     assert set(params.keys()) == {"rent_max"}
@@ -147,8 +164,9 @@ def test_craigslist_radius():
         max_distance_km=5.0,
         max_monthly_rent=2500,
     )
-    urls = build_search_urls(_site("craigslist"), search)
-    parsed = urlparse(urls[0])
+    groups = build_search_urls(_site("craigslist"), search)
+    assert len(groups) == 1
+    parsed = urlparse(groups[0][0])
     params = parse_qs(parsed.query)
     assert "lat" in params
     assert "lon" in params
@@ -159,5 +177,6 @@ def test_craigslist_radius():
 def test_kijiji_max_price():
     """Kijiji should pass max rent as maxPrice."""
     search = SearchConfig(city="Toronto", max_monthly_rent=3000)
-    urls = build_search_urls(_site("kijiji"), search)
-    assert "maxPrice=3000" in urls[0]
+    groups = build_search_urls(_site("kijiji"), search)
+    assert len(groups) == 1
+    assert "maxPrice=3000" in groups[0][0]

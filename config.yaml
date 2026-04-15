@@ -17,7 +17,7 @@ scraping:
     headless: true
     request_delay_ms: 1000
     # Set to 50+ for production runs; keep at 10 for faster testing.
-    max_listings_per_site: 15
+    max_listings_per_site: 25
     max_retries: 3
     proxies: []
 
@@ -83,10 +83,15 @@ requirements:
     short_term_ok: true
     must_allow_pets: null
     must_have_parking: null
-    # Drop listings outside these neighborhoods (case-insensitive, substring match).
-    # Leave empty [] to allow all neighborhoods (recommended — use max_distance_km instead).
-    # AI-extracted neighborhood names are unreliable so this filter can be aggressive.
-    allowed_neighborhoods: []
+    # Drop listings outside these neighbourhoods (case-insensitive, substring match).
+    # Leave empty [] to allow all neighbourhoods (recommended — use max_distance_km instead).
+    # AI-extracted neighbourhood names are unreliable so this filter can be aggressive.
+    allowed_neighbourhoods: []
+    # Rentals.ca-specific: list of neighbourhood slugs to scrape (e.g. ["yorkville", "the-annex"]).
+    # Leave empty [] to auto-pick neighbourhoods within 1.5km of anchor_address.
+    # Valid slugs are defined in _RENTALS_CA_NEIGHBOURHOODS in src/scraper/sites.py.
+    # Listings are scraped equally across all selected neighbourhoods.
+    rentals_ca_neighbourhoods: ["yorkville", "the-annex", "bay-street-corridor", "kensington-chinatown"]
 
 # ─────────────────────────────────────────────
 # PREFERENCES (Weighted Scoring)
@@ -97,7 +102,7 @@ preferences:
       enabled: true
       weight: 8
       description: "Prefer listings in Yorkville specifically"
-      type: "neighborhood_match"
+      type: "neighbourhood_match"
       values: ["Yorkville", "Bloor-Yorkville"]
 
     - name: "Close to UofT"

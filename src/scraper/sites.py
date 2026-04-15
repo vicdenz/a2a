@@ -4,7 +4,7 @@ from urllib.parse import quote, urlencode
 
 from geopy.distance import geodesic
 
-from src.config import SearchConfig, SiteConfig
+from src.config import RequirementsConfig, SearchConfig, SiteConfig
 
 
 # ── Kijiji ────────────────────────────────────────────────────────────────────
@@ -23,11 +23,10 @@ _KIJIJI_CITY_SLUGS: dict[str, tuple[str, str]] = {
 }
 
 
-def _kijiji(search: SearchConfig) -> list[str]:
+def _kijiji(search: SearchConfig, requirements: RequirementsConfig) -> list[list[str]]:
     city_key = (search.city or "Toronto").lower()
     slug, loc_code = _KIJIJI_CITY_SLUGS.get(city_key, ("city-of-toronto", "1700273"))
 
-    # Build the category+attribute suffix
     suffix = f"c37l{loc_code}"
 
     # Only use max_monthly_rent in URL (broad net). Min rent and bedrooms are
@@ -44,12 +43,12 @@ def _kijiji(search: SearchConfig) -> list[str]:
         if params:
             url += f"?{urlencode(params)}"
         urls.append(url)
-    return urls
+    return [urls]
 
 
 # ── Craigslist ────────────────────────────────────────────────────────────────
 
-def _craigslist(search: SearchConfig) -> list[str]:
+def _craigslist(search: SearchConfig, requirements: RequirementsConfig) -> list[list[str]]:
     base = "https://toronto.craigslist.org/search/apa"
     # Only use max price and location in URL — cast a broad net.
     # Bedroom count and min price are checked by the AI + requirements filter,
@@ -71,20 +70,18 @@ def _craigslist(search: SearchConfig) -> list[str]:
             p["s"] = str(page * 120)
         url = f"{base}?{urlencode(p)}" if p else base
         urls.append(url)
-    return urls
+    return [urls]
 
 
 # ── Rentals.ca ────────────────────────────────────────────────────────────────
 # Rentals.ca serves geographically-tight listings on neighbourhood-slug URLs
-# (e.g. /toronto/yorkville). City-level URLs return broad, non-centered results
-# even with bbox/h3 params. To scope results to the anchor, we scrape every
-# neighbourhood whose centroid is within _RENTALS_CA_ADJACENCY_KM of the anchor
-# (i.e. truly adjacent, not "anywhere in max_distance_km radius"). Falls back
-# to the single closest slug if none are within the adjacency threshold.
+# (e.g. /toronto/yorkville). Either the user provides explicit slugs via
+# requirements.rentals_ca_neighbourhoods, or we auto-pick every neighbourhood
+# whose centroid is within _RENTALS_CA_ADJACENCY_KM of the anchor (truly
+# adjacent, not "anywhere in max_distance_km radius").
 
 # Only neighbourhoods whose centroid is within this many km of the anchor are
-# scraped. Distances larger than this aren't "adjacent" — they'd include
-# far-away neighbourhoods that happen to fall within max_distance_km.
+# scraped when auto-picking.
 _RENTALS_CA_ADJACENCY_KM = 1.5
 
 _RENTALS_CA_NEIGHBOURHOODS: dict[str, list[tuple[str, float, float]]] = {
@@ -114,7 +111,7 @@ _RENTALS_CA_NEIGHBOURHOODS: dict[str, list[tuple[str, float, float]]] = {
 }
 
 
-def _rentals_ca(search: SearchConfig) -> list[str]:
+def _rentals_ca(search: SearchConfig, requirements: RequirementsConfig) -> list[list[str]]:
     city = search.city.lower().replace(" ", "-") if search.city else "toronto"
     # Only use max rent — cast a broad net. Bedroom count, furnished, etc.
     # are checked by the AI + requirements filter downstream.
@@ -122,49 +119,60 @@ def _rentals_ca(search: SearchConfig) -> list[str]:
     if search.max_monthly_rent is not None:
         params["rent_max"] = str(int(search.max_monthly_rent))
 
-    # Pick every neighbourhood whose centroid is within _RENTALS_CA_ADJACENCY_KM
-    # of the anchor. Sort by ascending distance so the closest come first.
     slugs: list[str] = []
-    neighbourhoods = _RENTALS_CA_NEIGHBOURHOODS.get(city)
-    if (
-        neighbourhoods
-        and search.anchor_lat is not None
-        and search.anchor_lng is not None
-    ):
-        anchor = (search.anchor_lat, search.anchor_lng)
-        ranked = sorted(
-            ((slug, geodesic(anchor, (lat, lng)).km) for slug, lat, lng in neighbourhoods),
-            key=lambda x: x[1],
-        )
-        slugs = [slug for slug, dist in ranked if dist <= _RENTALS_CA_ADJACENCY_KM]
-        # Fallback: if no neighbourhood is within the adjacency threshold,
-        # use the single closest so we still return something.
-        if not slugs and ranked:
-            slugs = [ranked[0][0]]
-
-    if slugs:
-        bases = [f"https://rentals.ca/{city}/{slug}" for slug in slugs]
+    if requirements.rentals_ca_neighbourhoods:
+        # Trust user-provided slugs verbatim — preserve their order.
+        slugs = list(requirements.rentals_ca_neighbourhoods)
     else:
-        bases = [f"https://rentals.ca/{city}"]
+        # Auto-pick neighbourhoods within _RENTALS_CA_ADJACENCY_KM of the anchor,
+        # sorted ascending by distance.
+        neighbourhoods = _RENTALS_CA_NEIGHBOURHOODS.get(city)
+        if (
+            neighbourhoods
+            and search.anchor_lat is not None
+            and search.anchor_lng is not None
+        ):
+            anchor = (search.anchor_lat, search.anchor_lng)
+            ranked = sorted(
+                ((slug, geodesic(anchor, (lat, lng)).km) for slug, lat, lng in neighbourhoods),
+                key=lambda x: x[1],
+            )
+            slugs = [slug for slug, dist in ranked if dist <= _RENTALS_CA_ADJACENCY_KM]
+            # Fallback: if no neighbourhood is within the adjacency threshold,
+            # use the single closest so we still return something.
+            if not slugs and ranked:
+                slugs = [ranked[0][0]]
 
-    # Interleave: all neighbourhoods page 1, then all page 2, etc. The engine
-    # short-circuits once max_listings_per_site is reached, so this ordering
-    # guarantees we sample every adjacent neighbourhood before re-paginating.
-    urls = []
-    for page in range(1, 4):
-        for base in bases:
+    if not slugs:
+        # No anchor coords and no explicit list — fall back to city-level URL.
+        urls = []
+        for page in range(1, 4):
             p = dict(params)
             if page > 1:
                 p["p"] = str(page)
-            url = f"{base}?{urlencode(p)}" if p else base
-            urls.append(url)
-    return urls
+            base = f"https://rentals.ca/{city}"
+            urls.append(f"{base}?{urlencode(p)}" if p else base)
+        return [urls]
+
+    # One group per neighbourhood. The engine applies an equal listing quota
+    # per group, so each neighbourhood contributes the same number of listings.
+    groups: list[list[str]] = []
+    for slug in slugs:
+        base = f"https://rentals.ca/{city}/{slug}"
+        urls = []
+        for page in range(1, 4):
+            p = dict(params)
+            if page > 1:
+                p["p"] = str(page)
+            urls.append(f"{base}?{urlencode(p)}" if p else base)
+        groups.append(urls)
+    return groups
 
 
 # ── Airbnb ────────────────────────────────────────────────────────────────────
 # Pagination via items_offset query param (increments of 20).
 
-def _airbnb(search: SearchConfig) -> list[str]:
+def _airbnb(search: SearchConfig, requirements: RequirementsConfig) -> list[list[str]]:
     base = "https://www.airbnb.ca/s"
     city = search.city or "Toronto"
     location = quote(f"{city}--ON--Canada")
@@ -195,19 +203,19 @@ def _airbnb(search: SearchConfig) -> list[str]:
             p["items_offset"] = str(page * 20)
         url = f"{base}/{location}/homes?{urlencode(p)}"
         urls.append(url)
-    return urls
+    return [urls]
 
 
 # ── Facebook Marketplace ─────────────────────────────────────────────────────
 
-def _facebook_marketplace(search: SearchConfig) -> list[str]:
+def _facebook_marketplace(search: SearchConfig, requirements: RequirementsConfig) -> list[list[str]]:
     city = search.city or "Toronto"
     base = f"https://www.facebook.com/marketplace/{city.lower()}/propertyrentals"
     params: dict[str, str] = {}
     if search.max_monthly_rent is not None:
         params["maxPrice"] = str(int(search.max_monthly_rent))
     url = f"{base}?{urlencode(params)}" if params else base
-    return [url]
+    return [[url]]
 
 
 # ── Registry ─────────────────────────────────────────────────────────────────
@@ -222,8 +230,15 @@ URL_BUILDERS: dict[str, callable] = {
 }
 
 
-def build_search_urls(site: SiteConfig, search: SearchConfig) -> list[str]:
+def build_search_urls(
+    site: SiteConfig,
+    search: SearchConfig,
+    requirements: RequirementsConfig | None = None,
+) -> list[list[str]]:
+    """Return URL groups. Each inner list is one logical bucket (e.g. a
+    neighbourhood). The engine applies an equal listing quota per group so
+    multi-bucket sites are sampled fairly."""
     builder = URL_BUILDERS.get(site.url_builder)
     if builder is None:
         raise ValueError(f"Unknown url_builder: {site.url_builder}")
-    return builder(search)
+    return builder(search, requirements or RequirementsConfig())

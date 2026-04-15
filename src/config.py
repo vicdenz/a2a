@@ -57,7 +57,10 @@ class RequirementsConfig(BaseModel):
     must_have_laundry: bool | None = None
     must_have_parking: bool | None = None
     short_term_ok: bool = True
-    allowed_neighborhoods: list[str] = Field(default_factory=list)
+    allowed_neighbourhoods: list[str] = Field(default_factory=list)
+    # Rentals.ca: explicit neighbourhood slugs to scrape. Empty list = auto-pick
+    # neighbourhoods adjacent to anchor_address (current behaviour).
+    rentals_ca_neighbourhoods: list[str] = Field(default_factory=list)
 
 
 class PreferenceConfig(BaseModel):
@@ -67,7 +70,7 @@ class PreferenceConfig(BaseModel):
     description: str
     type: str
     field: str | None = None
-    values: list[str] = Field(default_factory=list)  # used by neighborhood_match type
+    values: list[str] = Field(default_factory=list)  # used by neighbourhood_match type
 
 
 class OutputConfig(BaseModel):

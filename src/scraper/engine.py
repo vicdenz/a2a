@@ -91,33 +91,47 @@ async def scrape_all(config: AppConfig) -> list[tuple[str, str, str]]:
                 strategy_instances[site.strategy] = strategy_cls()
             strategy = strategy_instances[site.strategy]
 
-            # Build search URLs
-            search_urls = build_search_urls(site, config.search)
-            print(f"  Search pages: {len(search_urls)}")
+            # Build search URL groups. Each group is one logical bucket (e.g. a
+            # rentals.ca neighbourhood); sites without buckets return one group.
+            url_groups = build_search_urls(site, config.search, config.requirements)
+            total_pages = sum(len(g) for g in url_groups)
+            total_quota = config.scraping.max_listings_per_site
+            per_group_quota = max(1, total_quota // max(1, len(url_groups)))
+            if len(url_groups) > 1:
+                print(f"  Search pages: {total_pages} across {len(url_groups)} groups (quota: {per_group_quota}/group)")
+            else:
+                print(f"  Search pages: {total_pages}")
 
-            # Standard flow: collect listing URLs from search pages, then fetch each
+            # Collect listing URLs from each group, capped per-group so every
+            # bucket contributes its fair share before the global cap kicks in.
             listing_urls: list[str] = []
-            for search_url in search_urls:
-                if len(listing_urls) >= config.scraping.max_listings_per_site:
+            for group in url_groups:
+                if len(listing_urls) >= total_quota:
                     break
-
-                for attempt in range(1, config.scraping.max_retries + 1):
-                    try:
-                        print(f"  Fetching search page: {search_url[:80]}...")
-                        html = await strategy.fetch(search_url, site, config.scraping)
-                        page_urls = await _extract_listing_urls(html, site)
-                        listing_urls.extend(page_urls)
-                        print(f"  Found {len(page_urls)} listing links")
+                group_urls: list[str] = []
+                for search_url in group:
+                    if len(group_urls) >= per_group_quota:
                         break
-                    except Exception as e:
-                        print(f"  Attempt {attempt} failed: {e}")
-                        if attempt == config.scraping.max_retries:
-                            print(f"  Giving up on search page after {attempt} attempts")
 
-                await asyncio.sleep(config.scraping.request_delay_ms / 1000)
+                    for attempt in range(1, config.scraping.max_retries + 1):
+                        try:
+                            print(f"  Fetching search page: {search_url[:80]}...")
+                            html = await strategy.fetch(search_url, site, config.scraping)
+                            page_urls = await _extract_listing_urls(html, site)
+                            group_urls.extend(page_urls)
+                            print(f"  Found {len(page_urls)} listing links")
+                            break
+                        except Exception as e:
+                            print(f"  Attempt {attempt} failed: {e}")
+                            if attempt == config.scraping.max_retries:
+                                print(f"  Giving up on search page after {attempt} attempts")
 
-            # Deduplicate and cap
-            listing_urls = list(dict.fromkeys(listing_urls))[:config.scraping.max_listings_per_site]
+                    await asyncio.sleep(config.scraping.request_delay_ms / 1000)
+
+                listing_urls.extend(group_urls[:per_group_quota])
+
+            # Deduplicate and apply the overall cap
+            listing_urls = list(dict.fromkeys(listing_urls))[:total_quota]
             print(f"  Total unique listings to fetch: {len(listing_urls)}")
 
             # Fetch each listing page

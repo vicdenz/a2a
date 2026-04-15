@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Apartment Finder Report</title>
+<style>
+  :root {
+    --bg: #0f0f0f;
+    --card: #1a1a1a;
+    --border: #2a2a2a;
+    --text: #e0e0e0;
+    --muted: #888;
+    --accent: #4f9cf7;
+    --green: #4caf50;
+    --orange: #ff9800;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 24px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  h1 { font-size: 1.8rem; margin-bottom: 8px; }
+  .summary {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+    padding: 16px;
+    background: var(--card);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+  .summary .stat { text-align: center; }
+  .summary .stat .num { font-size: 2rem; font-weight: 700; color: var(--accent); }
+  .summary .stat .label { font-size: 0.8rem; color: var(--muted); text-transform: uppercase; }
+  .filters {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+  }
+  .chip {
+    padding: 4px 12px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+  .chip.active { border-color: var(--accent); color: var(--accent); }
+  .listings { display: grid; gap: 16px; }
+  .card {
+    display: grid;
+    grid-template-columns: 200px 1fr auto;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+  .card:hover { border-color: var(--accent); }
+  .card-img {
+    width: 200px;
+    height: 160px;
+    object-fit: cover;
+    background: var(--border);
+  }
+  .card-img.placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    font-size: 0.8rem;
+  }
+  .card-body { padding: 16px; }
+  .card-body h3 {
+    font-size: 1rem;
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 500px;
+  }
+  .card-body h3 a { color: var(--text); text-decoration: none; }
+  .card-body h3 a:hover { color: var(--accent); }
+  .card-meta { font-size: 0.85rem; color: var(--muted); margin-bottom: 8px; }
+  .card-price { font-size: 1.3rem; font-weight: 700; color: var(--green); }
+  .amenities { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  .amenity {
+    padding: 2px 8px;
+    background: #222;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    color: var(--muted);
+  }
+  .amenity.yes { color: var(--green); border: 1px solid #2a3a2a; }
+  .card-score {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 80px;
+    border-left: 1px solid var(--border);
+  }
+  .score-num { font-size: 1.5rem; font-weight: 700; color: var(--accent); }
+  .score-label { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; }
+  .score-bar {
+    width: 60px;
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    margin-top: 8px;
+    overflow: hidden;
+  }
+  .score-bar-fill { height: 100%; background: var(--accent); border-radius: 3px; }
+  .rank-badge {
+    display: inline-block;
+    background: var(--accent);
+    color: #000;
+    font-weight: 700;
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-right: 8px;
+  }
+  .filter-badge {
+    display: inline-block;
+    background: #3a2020;
+    color: #ff8a8a;
+    border: 1px solid #5a2a2a;
+    font-weight: 600;
+    font-size: 0.7rem;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-right: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .card.filtered-out { opacity: 0.55; border-style: dashed; }
+  .card.filtered-out .card-price { color: var(--orange); }
+  body.hide-filtered .card.filtered-out { display: none; }
+  .filter-reason {
+    font-size: 0.75rem;
+    color: #ff8a8a;
+    margin-top: 4px;
+    font-style: italic;
+  }
+  .toggle-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  .toggle-btn {
+    background: var(--card);
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 8px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-family: inherit;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .toggle-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .toggle-btn .count { color: var(--muted); margin-left: 6px; font-size: 0.75rem; }
+  .breakdown {
+    font-size: 0.7rem;
+    color: var(--muted);
+    margin-top: 4px;
+    max-width: 80px;
+    text-align: center;
+  }
+  @media (max-width: 700px) {
+    .card { grid-template-columns: 1fr; }
+    .card-img { width: 100%; height: 180px; }
+    .card-score { flex-direction: row; gap: 12px; border-left: none; border-top: 1px solid var(--border); }
+  }
+</style>
+</head>
+<body class="hide-filtered">
+<h1>Apartment Finder Report</h1>
+<p style="color:var(--muted);margin-bottom:16px;">Generated {{ generated_at }}</p>
+
+<div class="summary">
+  <div class="stat">
+    <div class="num">{{ total_scraped }}</div>
+    <div class="label">Scraped</div>
+  </div>
+  <div class="stat">
+    <div class="num">{{ total_filtered }}</div>
+    <div class="label">After Filter</div>
+  </div>
+  <div class="stat">
+    <div class="num">{{ sites_count }}</div>
+    <div class="label">Sites</div>
+  </div>
+</div>
+
+{% if active_filters %}
+<div class="filters">
+  <span style="color:var(--muted);font-size:0.8rem;align-self:center;">Filters:</span>
+  {% for f in active_filters %}
+  <span class="chip active">{{ f }}</span>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% set filtered_out_count = total_listings - total_filtered %}
+<div class="toggle-row">
+  <span style="color:var(--muted);font-size:0.85rem;">
+    Showing <span id="visible-count">{{ total_filtered }}</span> of {{ total_listings }} listings
+  </span>
+  <button id="toggle-btn" class="toggle-btn" onclick="toggleFiltered()">
+    <span id="toggle-label">Show filtered-out</span>
+    <span class="count">({{ filtered_out_count }})</span>
+  </button>
+</div>
+
+<div class="listings">
+{% for listing in listings %}
+<div class="card{% if not listing.passed_filter %} filtered-out{% endif %}">
+  {% if listing.images %}
+  <img class="card-img" src="{{ listing.images[0] }}" alt="listing photo" loading="lazy" onerror="this.outerHTML='<div class=\'card-img placeholder\'>No image</div>'">
+  {% else %}
+  <div class="card-img placeholder">No image</div>
+  {% endif %}
+
+  <div class="card-body">
+    <h3>
+      <span class="rank-badge">#{{ loop.index }}</span>
+      {% if not listing.passed_filter %}<span class="filter-badge" title="Did not pass requirements filter">⚑ Filtered out</span>{% endif %}
+      <a href="{{ listing.url }}" target="_blank" rel="noopener">{{ listing.title or "Untitled Listing" }}</a>
+    </h3>
+    {% if not listing.passed_filter and listing.filter_reason %}
+    <div class="filter-reason">Reason: {{ listing.filter_reason }}</div>
+    {% endif %}
+    <div class="card-meta">
+      {{ listing.source }}
+      {% if listing.neighborhood %} &middot; {{ listing.neighborhood }}{% endif %}
+      {% if listing.address %} &middot; {{ listing.address }}{% endif %}
+      {% if listing.distance_km is not none %} &middot; {{ listing.distance_km }} km away{% endif %}
+    </div>
+    <span class="card-price">
+      {% if listing.monthly_rent is not none %}
+        ${{ "%.0f"|format(listing.monthly_rent) }}/mo
+      {% else %}
+        Price N/A
+      {% endif %}
+    </span>
+    <span style="color:var(--muted);font-size:0.85rem;margin-left:8px;">
+      {% if listing.bedrooms is not none %}{{ listing.bedrooms }} bed{% endif %}
+      {% if listing.bathrooms is not none %} &middot; {{ listing.bathrooms }} bath{% endif %}
+      {% if listing.sqft %} &middot; {{ listing.sqft }} sqft{% endif %}
+    </span>
+    <div class="amenities">
+      {% if listing.furnished %}<span class="amenity yes">Furnished</span>{% endif %}
+      {% if listing.laundry_in_unit %}<span class="amenity yes">In-unit Laundry</span>{% endif %}
+      {% if listing.laundry_shared %}<span class="amenity">Shared Laundry</span>{% endif %}
+      {% if listing.utilities_included %}<span class="amenity yes">Utilities Incl.</span>{% endif %}
+      {% if listing.parking_included %}<span class="amenity yes">Parking</span>{% endif %}
+      {% if listing.pets_allowed %}<span class="amenity yes">Pets OK</span>{% endif %}
+      {% if listing.ac %}<span class="amenity yes">A/C</span>{% endif %}
+      {% if listing.dishwasher %}<span class="amenity yes">Dishwasher</span>{% endif %}
+      {% if listing.outdoor_space %}<span class="amenity yes">Outdoor</span>{% endif %}
+      {% if listing.gym %}<span class="amenity yes">Gym</span>{% endif %}
+      {% if listing.lease_term %}<span class="amenity">{{ listing.lease_term }}</span>{% endif %}
+    </div>
+  </div>
+
+  <div class="card-score">
+    <div class="score-num">{{ "%.1f"|format(listing.score or 0) }}</div>
+    <div class="score-label">Score</div>
+    {% set max_possible = max_score if max_score else 1 %}
+    <div class="score-bar">
+      <div class="score-bar-fill" style="width:{{ ((listing.score or 0) / max_possible * 100)|int }}%"></div>
+    </div>
+    {% if listing.score_breakdown %}
+    <div class="breakdown">
+      {% for k, v in listing.score_breakdown.items() %}
+      {% if v > 0 %}{{ k }}: +{{ v }}<br>{% endif %}
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endfor %}
+</div>
+
+{% if not listings %}
+<p style="color:var(--muted);text-align:center;padding:40px;">No listings matched your requirements.</p>
+{% endif %}
+
+<script>
+  const TOTAL = {{ total_listings }};
+  const PASSED = {{ total_filtered }};
+  function toggleFiltered() {
+    const body = document.body;
+    const label = document.getElementById('toggle-label');
+    const count = document.getElementById('visible-count');
+    if (body.classList.contains('hide-filtered')) {
+      body.classList.remove('hide-filtered');
+      label.textContent = 'Hide filtered-out';
+      count.textContent = TOTAL;
+    } else {
+      body.classList.add('hide-filtered');
+      label.textContent = 'Show filtered-out';
+      count.textContent = PASSED;
+    }
+  }
+</script>
+
+</body>
+</html>

@@ -5,16 +5,18 @@
 .env
 
 # Runtime output (reports, scrape cache)
-output/
+/output/
 
 # Python
 __pycache__/
 *.pyc
 *.egg-info/
 .venv/
+.pytest_cache/
 
 # Crawlee state
 .crawlee/
 
 # Local AI instructions
 CLAUDE.md
+.claude
