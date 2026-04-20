@@ -63,10 +63,10 @@ def filter_listings(listings: list[Listing], requirements: RequirementsConfig) -
             if listing.parking_included is not None and listing.parking_included != requirements.must_have_parking:
                 drop_reason = f"must_have_parking (extracted: {listing.parking_included})"
 
-        # short_term_ok — keep if missing
-        if drop_reason is None and requirements.short_term_ok:
+        # require_short_term — keep if missing
+        if drop_reason is None and requirements.require_short_term:
             if listing.short_term_available is not None and listing.short_term_available is False:
-                drop_reason = "short_term_ok (explicitly not short-term)"
+                drop_reason = "require_short_term (explicitly not short-term)"
 
         if drop_reason is None:
             listing.passed_filter = True

@@ -42,7 +42,7 @@ def _write_config(path, overrides=None):
             "must_allow_pets": None,
             "must_have_laundry": None,
             "must_have_parking": None,
-            "short_term_ok": True,
+            "require_short_term": True,
         },
         "preferences": [],
         "output": {

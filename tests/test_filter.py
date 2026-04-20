@@ -79,7 +79,7 @@ def test_filter_distance():
 
 
 def test_filter_short_term():
-    reqs = RequirementsConfig(short_term_ok=True)
+    reqs = RequirementsConfig(require_short_term=True)
     listings = [
         _make_listing(short_term_available=True),
         _make_listing(short_term_available=False),  # Failed
