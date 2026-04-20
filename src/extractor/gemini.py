@@ -326,7 +326,7 @@ async def _geocode_listing(
         _last_geocode_time = time.time()
 
         try:
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             location = await loop.run_in_executor(None, geolocator.geocode, query)
         except Exception:
             return

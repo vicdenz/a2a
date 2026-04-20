@@ -88,7 +88,7 @@ async def _geocode_anchor(address: str) -> tuple[float, float] | None:
     """Geocode the anchor address once at startup. Returns (lat, lng) or None."""
     try:
         geolocator = Nominatim(user_agent="a2a")
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         location = await loop.run_in_executor(None, geolocator.geocode, address)
         if location:
             return location.latitude, location.longitude
