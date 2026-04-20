@@ -78,7 +78,7 @@ def generate_output(
     if "html" in output_config.formats:
         html_path = out_dir / "report.html"
         template_dir = Path(__file__).parent / "templates"
-        env = Environment(loader=FileSystemLoader(str(template_dir)))
+        env = Environment(loader=FileSystemLoader(str(template_dir)), autoescape=True)
         template = env.get_template("report.html.j2")
 
         # Build active filter descriptions
