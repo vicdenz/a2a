@@ -17,7 +17,7 @@ scraping:
     headless: true
     request_delay_ms: 1000
     # Set to 50+ for production runs; keep at 10 for faster testing.
-    max_listings_per_site: 25
+    max_listings_per_site: 50
     max_retries: 3
     proxies: []
 
@@ -36,7 +36,7 @@ websites:
       strategy: "crawlee"
 
     - name: "Rentals.ca"
-      enabled: true 
+      enabled: true
       base_url: "https://rentals.ca"
       url_builder: "rentals_ca"
       strategy: "crawlee"

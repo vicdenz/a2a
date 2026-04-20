@@ -50,7 +50,7 @@ def generate_output(
         fieldnames = [
             "rank", "passed_filter", "filter_reason", "score", "source",
             "title", "monthly_rent", "bedrooms", "bathrooms", "furnished",
-            "distance_km", "neighborhood", "address", "lease_term", "url",
+            "distance_km", "neighbourhood", "address", "lease_term", "url",
         ]
         with open(csv_path, "w", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames)
@@ -68,7 +68,7 @@ def generate_output(
                     "bathrooms": listing.bathrooms,
                     "furnished": listing.furnished,
                     "distance_km": listing.distance_km,
-                    "neighborhood": listing.neighborhood,
+                    "neighbourhood": listing.neighbourhood,
                     "address": listing.address,
                     "lease_term": listing.lease_term,
                     "url": listing.url,
