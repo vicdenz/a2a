@@ -20,7 +20,7 @@ from src.extractor.schema import EXTRACTION_FIELDS, Listing
 os.environ.setdefault("GRPC_ENABLE_FORK_SUPPORT", "0")
 
 # Free-tier Gemini rate limits (RPM = requests per minute).
-# gemini-3.1-flash-lite-preview free tier: 15 RPM, 500 RPD, 250K TPM.
+# gemini-2.0-flash-lite free tier: 15 RPM, 1500 RPD, 1M TPM.
 # We use 12 RPM to leave a comfortable margin.
 _rpm_limit = 12
 # Minimum seconds between any two consecutive requests (60 / rpm).
@@ -149,7 +149,7 @@ Return only the JSON object. No explanation, no markdown fences."""
 
 # ── Batched extraction ────────────────────────────────────────────────────────
 # Bundle multiple listings into one API call to reduce request count.
-# Free tier: 10 RPM but ~1M TPM — we're request-limited, not token-limited.
+# Free tier: 15 RPM but ~1M TPM — we're request-limited, not token-limited.
 # Keep at 3 (not 5) to avoid "lost in the middle" where the model misses fields
 # for listings buried deep in a large concatenated prompt.
 _BATCH_SIZE = 3
