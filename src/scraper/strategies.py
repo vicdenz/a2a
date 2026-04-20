@@ -73,7 +73,7 @@ class CamoufoxStrategy(ScraperStrategy):
         await self._ensure_browser(scraping_config)
         page = await self._browser.new_page()
         try:
-            # Inject cookies if provided (e.g. Facebook)
+            # Inject cookies if the site config provides them
             if site_config.cookies:
                 cookie_list = [
                     {"name": c.name, "value": c.value, "domain": c.domain, "path": "/"}

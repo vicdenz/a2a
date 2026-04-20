@@ -4,6 +4,9 @@
 # Secrets
 .env
 
+# Local config (user-specific search params — see config.example.yaml for the template)
+config.yaml
+
 # Runtime output (reports, scrape cache)
 /output/
 

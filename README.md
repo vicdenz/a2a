@@ -36,7 +36,11 @@ Open `.env` and fill in your Gemini API key.
 
 ### 4. Configure your search
 
-Edit `config.yaml` with your search parameters — city, budget, move-in date, requirements, and preferences.
+```bash
+cp config.example.yaml config.yaml
+```
+
+Edit `config.yaml` with your search parameters — city, budget, move-in date, requirements, and preferences. `config.yaml` is gitignored; `config.example.yaml` is the template.
 
 ## Run
 
@@ -82,25 +86,31 @@ Five-stage async pipeline: **Scrape → Extract → Filter → Score → Output*
 
 ## Supported Sites
 
-| Site | Strategy | Status |
-|---|---|---|
-| Kijiji | Playwright | Working |
-| Craigslist | Playwright | Working (radius search via lat/lon) |
-| Rentals.ca | Playwright | Working |
-| Airbnb | Zendriver (Cloudflare bypass) | Working (~75% success rate) |
-| Facebook Marketplace | Camoufox | Requires session cookies |
+| Site | Strategy |
+|---|---|
+| Kijiji | Playwright |
+| Craigslist | Playwright |
+| Rentals.ca | Playwright |
+| Airbnb | Zendriver (Cloudflare bypass) |
 
 ## CLI Flags
 
 ```bash
-uv run python -m src.main          # full pipeline
-uv run python -m src.main -s       # scrape only (no AI calls)
-uv run python -m src.main -a       # skip filter, output all extracted listings
+uv run python -m src.main                 # full pipeline
+uv run python -m src.main -s/--scrape-only      # scrape only, save raw HTML to cache and stop (no AI calls)
+uv run python -m src.main -r/--resume           # skip scraping, resume extraction from scrape cache
+uv run python -m src.main -p/--post-extract     # skip scrape + extract, re-run filter/score/output from extract cache
+uv run python -m src.main -a/--all              # skip filter, output all extracted listings
 ```
+
+Each stage writes a cache to `output/` (`scrape_cache.json`, `extract_cache.json`) so you can iterate on filters and preferences without re-running the expensive upstream stages.
 
 ## Known Limitations
 
-- **Facebook Marketplace** — disabled by default; requires manually exporting session cookies from a logged-in browser into `config.yaml`
-- **Airbnb** — Cloudflare bypass succeeds ~75% of the time; expect fewer results than other sites
 - **Geocoding** — Nominatim (free) is rate-limited to 1 req/sec; slow for large result sets
-- **Gemini API** — free tier is 10 RPM; extraction runs at ~8 RPM to stay under the limit
+- **Gemini API** — free-tier rate limits constrain throughput; see `ai.model` comments in `config.example.yaml` for current model RPM/TPM/RPD quotas
+- **Rentals.ca neighbourhood slugs** — only Toronto neighbourhoods are currently defined in `_RENTALS_CA_NEIGHBOURHOODS` (`src/scraper/sites.py`); other cities fall back to the city-level URL
+
+---
+
+Scraping may violate the terms of service of the listed sites — this is a personal project for educational use, run at your own discretion.

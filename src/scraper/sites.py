@@ -206,18 +206,6 @@ def _airbnb(search: SearchConfig, requirements: RequirementsConfig) -> list[list
     return [urls]
 
 
-# ── Facebook Marketplace ─────────────────────────────────────────────────────
-
-def _facebook_marketplace(search: SearchConfig, requirements: RequirementsConfig) -> list[list[str]]:
-    city = search.city or "Toronto"
-    base = f"https://www.facebook.com/marketplace/{city.lower()}/propertyrentals"
-    params: dict[str, str] = {}
-    if search.max_monthly_rent is not None:
-        params["maxPrice"] = str(int(search.max_monthly_rent))
-    url = f"{base}?{urlencode(params)}" if params else base
-    return [[url]]
-
-
 # ── Registry ─────────────────────────────────────────────────────────────────
 
 URL_BUILDERS: dict[str, callable] = {
@@ -226,7 +214,6 @@ URL_BUILDERS: dict[str, callable] = {
     "rentals_ca": _rentals_ca,
 
     "airbnb": _airbnb,
-    "facebook_marketplace": _facebook_marketplace,
 }
 
 

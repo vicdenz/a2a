@@ -26,6 +26,14 @@ else
     echo ".env already exists, skipping."
 fi
 
+# Create config.yaml from example if it doesn't exist
+if [ ! -f "config.yaml" ]; then
+    cp config.example.yaml config.yaml
+    echo "Created config.yaml from config.example.yaml — edit it with your search parameters."
+else
+    echo "config.yaml already exists, skipping."
+fi
+
 echo ""
 echo "=== Setup complete ==="
 echo "Next steps:"

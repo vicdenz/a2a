@@ -1,6 +1,6 @@
 # ─────────────────────────────────────────────
-# a2a — USER CONFIGURATION
-# Edit this file to control the entire pipeline.
+# a2a — USER CONFIGURATION TEMPLATE
+# Copy to config.yaml and fill in the fields below.
 # ─────────────────────────────────────────────
 
 # ── Gemini AI Settings ────────────────────────
@@ -17,42 +17,35 @@ scraping:
     headless: true
     request_delay_ms: 1000
     # Set to 50+ for production runs; keep at 10 for faster testing.
-    max_listings_per_site: 50
+    max_listings_per_site: 20
     max_retries: 3
     proxies: []
 
 # ── Websites to Scrape ────────────────────────
 websites:
     - name: "Kijiji"
-      enabled: true # working
+      enabled: false
       base_url: "https://www.kijiji.ca"
       url_builder: "kijiji"
       strategy: "crawlee"
 
     - name: "Craigslist Toronto"
-      enabled: true # working
+      enabled: false
       base_url: "https://toronto.craigslist.org"
       url_builder: "craigslist"
       strategy: "crawlee"
 
     - name: "Rentals.ca"
-      enabled: true
+      enabled: false
       base_url: "https://rentals.ca"
       url_builder: "rentals_ca"
       strategy: "crawlee"
 
     - name: "Airbnb (Monthly Stays)"
-      enabled: false # poor results
+      enabled: false
       base_url: "https://www.airbnb.ca"
       url_builder: "airbnb"
       strategy: "zendriver"
-
-    - name: "Facebook Marketplace"
-      enabled: false # requires manually exporting session cookies from a logged-in browser
-      base_url: "https://www.facebook.com"
-      url_builder: "facebook_marketplace"
-      strategy: "camoufox"
-      cookies: []
 
 # ─────────────────────────────────────────────
 # SEARCH PARAMETERS
@@ -61,12 +54,12 @@ websites:
 # ─────────────────────────────────────────────
 
 search:
-    city: "Toronto"
-    anchor_address: "27 King's College Circle, Toronto, ON"
-    max_distance_km: 2 # radius in km around anchor_address
-    move_in_date: "2026-09-01"
-    lease_duration_months: 8 # used by Airbnb to compute checkout date
-    max_monthly_rent: 3200 # upper price cap injected into search URLs (CAD)
+    city: "<enter city, e.g. Toronto>"
+    anchor_address: "<enter full address, e.g. 100 Queen St W, Toronto, ON>"
+    max_distance_km: null # radius in km around anchor_address
+    move_in_date: "<YYYY-MM-DD>"
+    lease_duration_months: null # used by Airbnb to compute checkout date
+    max_monthly_rent: null # upper price cap injected into search URLs (CAD)
 
 # ─────────────────────────────────────────────
 # HARD REQUIREMENTS
@@ -75,11 +68,11 @@ search:
 # ─────────────────────────────────────────────
 
 requirements:
-    max_monthly_rent: 3200
-    min_bedrooms: 2
-    max_distance_km: 4
-    must_be_furnished: true
-    must_have_laundry: true
+    max_monthly_rent: null
+    min_bedrooms: null
+    max_distance_km: null
+    must_be_furnished: null
+    must_have_laundry: null
     short_term_ok: true
     must_allow_pets: null
     must_have_parking: null
@@ -87,53 +80,55 @@ requirements:
     # Leave empty [] to allow all neighbourhoods (recommended — use max_distance_km instead).
     # AI-extracted neighbourhood names are unreliable so this filter can be aggressive.
     allowed_neighbourhoods: []
-    # Rentals.ca-specific: list of neighbourhood slugs to scrape (e.g. ["yorkville", "the-annex"]).
+    # Specific to Rentals.ca: list of neighbourhood slugs to scrape (e.g. ["yorkville", "the-annex"]).
     # Leave empty [] to auto-pick neighbourhoods within 1.5km of anchor_address.
     # Valid slugs are defined in _RENTALS_CA_NEIGHBOURHOODS in src/scraper/sites.py.
     # Listings are scraped equally across all selected neighbourhoods.
-    rentals_ca_neighbourhoods: ["yorkville", "the-annex", "bay-street-corridor", "kensington-chinatown"]
+    # NOTE: only Toronto neighbourhoods are currently defined — other cities fall back to the city-level URL.
+    rentals_ca_neighbourhoods: []
 
 # ─────────────────────────────────────────────
 # PREFERENCES (Weighted Scoring)
+# Enable the ones you care about and tune weights.
 # ─────────────────────────────────────────────
 
 preferences:
-    - name: "Yorkville neighbourhood"
-      enabled: true
+    - name: "Prefer specific neighbourhoods"
+      enabled: false
       weight: 8
-      description: "Prefer listings in Yorkville specifically"
+      description: "Prefer listings in certain neighbourhoods"
       type: "neighbourhood_match"
-      values: ["Yorkville", "Bloor-Yorkville"]
+      values: [] # e.g. ["Yorkville", "The Annex"]
 
-    - name: "Close to UofT"
-      enabled: true
+    - name: "Close to anchor address"
+      enabled: false
       weight: 9
       description: "Prefer listings closer to anchor_address"
       type: "distance"
 
     - name: "In-unit laundry"
-      enabled: true
+      enabled: false
       weight: 10
       description: "Prefer in-unit washer/dryer"
       type: "boolean_field"
       field: "laundry_in_unit"
 
     - name: "Furnished"
-      enabled: true
+      enabled: false
       weight: 9
       description: "Prefer furnished units"
       type: "boolean_field"
       field: "furnished"
 
     - name: "Utilities included"
-      enabled: true
+      enabled: false
       weight: 4
       description: "Prefer rent that includes heat/hydro/water"
       type: "boolean_field"
       field: "utilities_included"
 
     - name: "Balcony or outdoor space"
-      enabled: true
+      enabled: false
       weight: 2
       description: "Prefer units with a balcony, terrace, or yard"
       type: "boolean_field"

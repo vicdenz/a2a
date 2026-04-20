@@ -48,8 +48,6 @@ async def _extract_listing_urls(html: str, site: SiteConfig) -> list[str]:
         elif builder == "airbnb" and "/rooms/" in href:
             clean = re.sub(r"\?.*", "", full_url)
             urls.add(clean)
-        elif builder == "facebook_marketplace" and "/marketplace/item/" in href:
-            urls.add(full_url)
 
     # Debug: if no URLs found, log sample hrefs to help diagnose pattern issues
     if not urls and all_hrefs:
