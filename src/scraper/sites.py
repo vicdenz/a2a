@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from urllib.parse import quote, urlencode
 
 from geopy.distance import geodesic
@@ -228,7 +229,7 @@ def _airbnb(search: SearchConfig, requirements: RequirementsConfig) -> list[list
 
 # ── Registry ─────────────────────────────────────────────────────────────────
 
-URL_BUILDERS: dict[str, callable] = {
+URL_BUILDERS: dict[str, Callable[..., list[list[str]]]] = {
     "kijiji": _kijiji,
     "craigslist": _craigslist,
     "rentals_ca": _rentals_ca,
