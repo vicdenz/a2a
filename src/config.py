@@ -56,7 +56,7 @@ class RequirementsConfig(BaseModel):
     must_allow_pets: bool | None = None
     must_have_laundry: bool | None = None
     must_have_parking: bool | None = None
-    require_short_term: bool = True
+    require_short_term: bool = False
     allowed_neighbourhoods: list[str] = Field(default_factory=list)
     # Rentals.ca: explicit neighbourhood slugs to scrape. Empty list = auto-pick
     # neighbourhoods adjacent to anchor_address (current behaviour).

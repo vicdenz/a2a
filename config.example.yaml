@@ -73,7 +73,7 @@ requirements:
     max_distance_km: null
     must_be_furnished: null
     must_have_laundry: null
-    require_short_term: true
+    require_short_term: false
     must_allow_pets: null
     must_have_parking: null
     # Drop listings outside these neighbourhoods (case-insensitive, substring match).
