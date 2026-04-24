@@ -93,6 +93,7 @@ class CamoufoxStrategy(ScraperStrategy):
                 await self._camoufox.__aexit__(None, None, None)
             except Exception:
                 pass
+            del self._camoufox
             self._browser = None
 
 
