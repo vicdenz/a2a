@@ -409,7 +409,7 @@ async def extract_all(
     if config.search.anchor_lat is not None and config.search.anchor_lng is not None:
         anchor_coords = (config.search.anchor_lat, config.search.anchor_lng)
 
-    if anchor_coords or config.search.anchor_address:
+    if anchor_coords:
         print(f"  Geocoding {len(listings)} listings (1 req/sec)...")
         for listing in listings:
             await _geocode_listing(listing, anchor_coords)
