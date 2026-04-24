@@ -64,7 +64,7 @@ class Listing(BaseModel):
 
     # Meta
     scraped_at: datetime = Field(default_factory=datetime.now)
-    raw_html_hash: str | None = None
+    cleaned_html_hash: str | None = None
 
 
 # JSON schema string for the extraction prompt — excludes pipeline-only fields

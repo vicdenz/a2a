@@ -271,7 +271,7 @@ async def _extract_batch(
             single_data = _parse_json_response(single_text)
             if isinstance(single_data, dict):
                 try:
-                    results.append(Listing(url=url, source=site_name, scraped_at=datetime.now(), raw_html_hash=html_hash, **single_data))
+                    results.append(Listing(url=url, source=site_name, scraped_at=datetime.now(), cleaned_html_hash=html_hash, **single_data))
                 except Exception as e:
                     print(f"  Validation error for {url[:60]}: {e}")
         return results
@@ -298,7 +298,7 @@ async def _extract_batch(
                 url=url,
                 source=site_name,
                 scraped_at=datetime.now(),
-                raw_html_hash=html_hash,
+                cleaned_html_hash=html_hash,
                 **item_data,
             )
             listings.append(listing)
@@ -409,14 +409,14 @@ async def extract_all(
         for listing in listings:
             await _geocode_listing(listing, anchor_coords)
 
-    # Deduplicate by raw_html_hash
+    # Deduplicate by cleaned_html_hash
     seen_hashes: set[str] = set()
     deduped: list[Listing] = []
     for listing in listings:
-        if listing.raw_html_hash and listing.raw_html_hash in seen_hashes:
+        if listing.cleaned_html_hash and listing.cleaned_html_hash in seen_hashes:
             continue
-        if listing.raw_html_hash:
-            seen_hashes.add(listing.raw_html_hash)
+        if listing.cleaned_html_hash:
+            seen_hashes.add(listing.cleaned_html_hash)
         deduped.append(listing)
 
     print(f"  After deduplication: {len(deduped)} listings")
