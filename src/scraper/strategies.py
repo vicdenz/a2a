@@ -88,7 +88,7 @@ class CamoufoxStrategy(ScraperStrategy):
             await page.close()
 
     async def close(self) -> None:
-        if self._browser:
+        if hasattr(self, "_camoufox"):
             try:
                 await self._camoufox.__aexit__(None, None, None)
             except Exception:
