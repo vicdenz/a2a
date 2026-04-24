@@ -103,9 +103,11 @@ def _load_extract_cache(output_dir: str) -> list[Listing] | None:
 async def _geocode_anchor(address: str) -> tuple[float, float] | None:
     """Geocode the anchor address once at startup. Returns (lat, lng) or None."""
     try:
-        from src.extractor.gemini import _geolocator
+        import time
+        from src.extractor import gemini as _geo_mod
         loop = asyncio.get_running_loop()
-        location = await loop.run_in_executor(None, _geolocator.geocode, address)
+        location = await loop.run_in_executor(None, _geo_mod._geolocator.geocode, address)
+        _geo_mod._last_geocode_time = time.time()
         if location:
             return location.latitude, location.longitude
     except Exception:
