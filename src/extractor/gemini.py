@@ -212,13 +212,18 @@ async def _call_gemini(
                 return response.text.strip()
             except Exception as e:
                 err_str = str(e)
-                if "429" in err_str or "quota" in err_str.lower():
-                    retry_match = re.search(r"retry in ([\d.]+)s", err_str, re.IGNORECASE)
-                    wait = float(retry_match.group(1)) + 1 if retry_match else 30
-                    if attempt < _MAX_RETRIES:
-                        print(f"  Rate limited{' on ' + label if label else ''}, waiting {wait:.0f}s (attempt {attempt}/{_MAX_RETRIES})...")
-                        await asyncio.sleep(wait)
-                        continue
+                is_rate_limit = "429" in err_str or "quota" in err_str.lower()
+                is_transient = any(code in err_str for code in ("500", "502", "503", "504"))
+                if (is_rate_limit or is_transient) and attempt < _MAX_RETRIES:
+                    if is_rate_limit:
+                        retry_match = re.search(r"retry in ([\d.]+)s", err_str, re.IGNORECASE)
+                        wait = float(retry_match.group(1)) + 1 if retry_match else 30
+                    else:
+                        wait = 5 * attempt
+                    kind = "Rate limited" if is_rate_limit else "Server error"
+                    print(f"  {kind}{' on ' + label if label else ''}, waiting {wait:.0f}s (attempt {attempt}/{_MAX_RETRIES})...")
+                    await asyncio.sleep(wait)
+                    continue
                 print(f"  Gemini API error{' for ' + label if label else ''}: {e}")
                 return None
     return None
