@@ -104,6 +104,11 @@ def load_config(config_path: str = "config.yaml") -> AppConfig:
     if not api_key:
         raise ValueError("GEMINI_API_KEY not set in .env or environment")
 
+    required_sections = ("ai", "scraping", "websites", "search", "requirements", "preferences", "output")
+    for section in required_sections:
+        if section not in raw:
+            raise ValueError(f"Missing required section '{section}' in {config_path}")
+
     return AppConfig(
         ai=AIConfig(**raw["ai"]),
         scraping=ScrapingConfig(**raw["scraping"]),
