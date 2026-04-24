@@ -5,7 +5,7 @@ import asyncio
 import json
 import os
 
-from geopy.geocoders import Nominatim
+from pydantic import ValidationError
 
 from src.config import load_config
 from src.extractor.gemini import extract_all
@@ -85,7 +85,7 @@ def _load_extract_cache() -> list[Listing] | None:
         with open(_EXTRACT_CACHE) as f:
             data = json.load(f)
         listings = [Listing(**d) for d in data]
-    except (json.JSONDecodeError, KeyError) as e:
+    except (json.JSONDecodeError, KeyError, ValidationError) as e:
         print(f"  Cache file corrupt ({e}) — delete {_EXTRACT_CACHE} and re-run")
         return None
     print(f"  Loaded {len(listings)} listings from extract cache")
