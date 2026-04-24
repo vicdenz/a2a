@@ -53,11 +53,11 @@ async def _extract_listing_urls(html: str, site: SiteConfig) -> list[str]:
     if not urls and all_hrefs:
         sample = [h for h in all_hrefs if h.startswith("/") or site.base_url in h][:10]
         if sample:
-            print(f"    DEBUG: No listing URLs matched. Sample hrefs from {site.name}:")
+            print(f"    No listing URLs matched. Sample hrefs from {site.name}:")
             for h in sample:
                 print(f"      {h[:120]}")
         else:
-            print(f"    DEBUG: {len(all_hrefs)} hrefs found but none match site domain. Page may be JS-rendered.")
+            print(f"    {len(all_hrefs)} hrefs found but none match site domain. Page may be JS-rendered.")
 
     return list(urls)
 
