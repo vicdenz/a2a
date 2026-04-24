@@ -380,7 +380,7 @@ async def extract_all(
     model_name = config.ai.model
 
     # Batch listings into groups to reduce API request count
-    # Free tier: 10 RPM but ~1M TPM — batching trades tokens for fewer requests
+    # Free tier: 15 RPM but ~1M TPM — batching trades tokens for fewer requests
     batches = [
         raw_pages[i : i + _BATCH_SIZE]
         for i in range(0, len(raw_pages), _BATCH_SIZE)
