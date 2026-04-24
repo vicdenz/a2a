@@ -15,8 +15,12 @@ from src.pipeline.filter import filter_listings
 from src.pipeline.scorer import score_and_rank
 from src.scraper.engine import scrape_all
 
-_SCRAPE_CACHE = "output/scrape_cache.json"
-_EXTRACT_CACHE = "output/extract_cache.json"
+_SCRAPE_CACHE_NAME = "scrape_cache.json"
+_EXTRACT_CACHE_NAME = "extract_cache.json"
+
+
+def _cache_path(output_dir: str, name: str) -> str:
+    return os.path.join(output_dir, name)
 
 
 def _parse_args() -> argparse.Namespace:
@@ -44,49 +48,53 @@ def _parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
-def _save_scrape_cache(raw_pages: list[tuple[str, str, str]]) -> None:
+def _save_scrape_cache(raw_pages: list[tuple[str, str, str]], output_dir: str) -> None:
     """Save scraped pages to disk so extraction can resume without re-scraping."""
-    os.makedirs(os.path.dirname(_SCRAPE_CACHE), exist_ok=True)
+    path = _cache_path(output_dir, _SCRAPE_CACHE_NAME)
+    os.makedirs(output_dir, exist_ok=True)
     data = [{"site": s, "url": u, "html": h} for s, u, h in raw_pages]
-    with open(_SCRAPE_CACHE, "w") as f:
+    with open(path, "w") as f:
         json.dump(data, f)
-    print(f"  Scrape cache saved: {_SCRAPE_CACHE} ({len(data)} pages)")
+    print(f"  Scrape cache saved: {path} ({len(data)} pages)")
 
 
-def _load_scrape_cache() -> list[tuple[str, str, str]] | None:
+def _load_scrape_cache(output_dir: str) -> list[tuple[str, str, str]] | None:
     """Load scraped pages from disk cache."""
-    if not os.path.exists(_SCRAPE_CACHE):
+    path = _cache_path(output_dir, _SCRAPE_CACHE_NAME)
+    if not os.path.exists(path):
         return None
     try:
-        with open(_SCRAPE_CACHE) as f:
+        with open(path) as f:
             data = json.load(f)
         pages = [(d["site"], d["url"], d["html"]) for d in data]
     except (json.JSONDecodeError, KeyError) as e:
-        print(f"  Cache file corrupt ({e}) — delete {_SCRAPE_CACHE} and re-run")
+        print(f"  Cache file corrupt ({e}) — delete {path} and re-run")
         return None
     print(f"  Loaded {len(pages)} pages from scrape cache")
     return pages
 
 
-def _save_extract_cache(listings: list[Listing]) -> None:
+def _save_extract_cache(listings: list[Listing], output_dir: str) -> None:
     """Save extracted listings to disk so filter/score/output can re-run without AI calls."""
-    os.makedirs(os.path.dirname(_EXTRACT_CACHE), exist_ok=True)
+    path = _cache_path(output_dir, _EXTRACT_CACHE_NAME)
+    os.makedirs(output_dir, exist_ok=True)
     data = [l.model_dump(mode="json") for l in listings]
-    with open(_EXTRACT_CACHE, "w") as f:
+    with open(path, "w") as f:
         json.dump(data, f)
-    print(f"  Extract cache saved: {_EXTRACT_CACHE} ({len(data)} listings)")
+    print(f"  Extract cache saved: {path} ({len(data)} listings)")
 
 
-def _load_extract_cache() -> list[Listing] | None:
+def _load_extract_cache(output_dir: str) -> list[Listing] | None:
     """Load extracted listings from disk cache."""
-    if not os.path.exists(_EXTRACT_CACHE):
+    path = _cache_path(output_dir, _EXTRACT_CACHE_NAME)
+    if not os.path.exists(path):
         return None
     try:
-        with open(_EXTRACT_CACHE) as f:
+        with open(path) as f:
             data = json.load(f)
         listings = [Listing(**d) for d in data]
     except (json.JSONDecodeError, KeyError, ValidationError) as e:
-        print(f"  Cache file corrupt ({e}) — delete {_EXTRACT_CACHE} and re-run")
+        print(f"  Cache file corrupt ({e}) — delete {path} and re-run")
         return None
     print(f"  Loaded {len(listings)} listings from extract cache")
     return listings
@@ -126,27 +134,31 @@ async def main(args: argparse.Namespace) -> None:
         else:
             print("  Warning: could not geocode anchor address, radius search unavailable")
 
+    out_dir = config.output.directory
+
     # Step 1–2: Scrape + Extract (or load from cache)
     if args.post_extract:
         # Skip scraping and extraction — load previously extracted listings
-        listings = _load_extract_cache()
+        listings = _load_extract_cache(out_dir)
         if not listings:
-            print(f"\nNo extract cache found at {_EXTRACT_CACHE}. Run without --post-extract first.")
+            extract_path = _cache_path(out_dir, _EXTRACT_CACHE_NAME)
+            print(f"\nNo extract cache found at {extract_path}. Run without --post-extract first.")
             return
         total_scraped = len(listings)
     else:
         # Step 1: Scrape (or load from cache)
         if args.resume:
-            raw_pages = _load_scrape_cache()
+            raw_pages = _load_scrape_cache(out_dir)
             if not raw_pages:
-                print(f"\nNo scrape cache found at {_SCRAPE_CACHE}. Run without --resume first.")
+                scrape_path = _cache_path(out_dir, _SCRAPE_CACHE_NAME)
+                print(f"\nNo scrape cache found at {scrape_path}. Run without --resume first.")
                 return
         else:
             raw_pages = await scrape_all(config)
 
             # Always save cache after scraping so data isn't lost
             if raw_pages:
-                _save_scrape_cache(raw_pages)
+                _save_scrape_cache(raw_pages, out_dir)
 
         total_scraped = len(raw_pages)
 
@@ -168,7 +180,7 @@ async def main(args: argparse.Namespace) -> None:
             return
 
         # Save extract cache so filter/score/output can re-run without AI calls
-        _save_extract_cache(listings)
+        _save_extract_cache(listings, out_dir)
 
     # Step 3: Filter — tags listings with passed_filter (does NOT drop them)
     if args.all:
