@@ -48,8 +48,28 @@ def _kijiji(search: SearchConfig, requirements: RequirementsConfig) -> list[list
 
 # ── Craigslist ────────────────────────────────────────────────────────────────
 
+_CRAIGSLIST_CITY_SUBDOMAINS: dict[str, str] = {
+    "toronto": "toronto",
+    "ottawa": "ottawa",
+    "vancouver": "vancouver",
+    "montreal": "montreal",
+    "calgary": "calgary",
+    "edmonton": "edmonton",
+    "victoria": "victoria",
+    "winnipeg": "winnipeg",
+    "halifax": "halifax",
+}
+
+
 def _craigslist(search: SearchConfig, requirements: RequirementsConfig) -> list[list[str]]:
-    base = "https://toronto.craigslist.org/search/apa"
+    city_key = (search.city or "toronto").lower()
+    subdomain = _CRAIGSLIST_CITY_SUBDOMAINS.get(city_key)
+    if subdomain is None:
+        raise ValueError(
+            f"Unsupported Craigslist city: '{search.city}'. "
+            f"Supported: {', '.join(sorted(_CRAIGSLIST_CITY_SUBDOMAINS))}"
+        )
+    base = f"https://{subdomain}.craigslist.org/search/apa"
     # Only use max price and location in URL — cast a broad net.
     # Bedroom count and min price are checked by the AI + requirements filter,
     # so we don't exclude "1+den" or cheap-but-great listings at the URL level.
