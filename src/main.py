@@ -182,7 +182,7 @@ async def main(args: argparse.Namespace) -> None:
 
     # Step 4: Score & rank (all listings — passed are sorted first)
     print(f"\n=== Scoring {len(listings)} listings ===")
-    ranked = score_and_rank(listings, config.preferences, config.search)
+    ranked = score_and_rank(listings, config.preferences, config.search, config.requirements)
     passed_count = sum(1 for l in ranked if l.passed_filter)
     top_passed_score = next((l.score for l in ranked if l.passed_filter), None)
     print(f"  Top passed score: {top_passed_score if top_passed_score is not None else 'N/A'}")

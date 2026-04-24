@@ -8,6 +8,7 @@ def score_and_rank(
     listings: list[Listing],
     preferences: list[PreferenceConfig],
     search: SearchConfig,
+    requirements: RequirementsConfig | None = None,
 ) -> list[Listing]:
     """Score listings by weighted preferences and sort descending."""
     if not listings:
@@ -27,7 +28,8 @@ def score_and_rank(
     max_rent = max(rents) if rents else 1
 
     distances = [l.distance_km for l in listings if l.distance_km is not None]
-    max_distance = search.max_distance_km or (max(distances) if distances else 10)
+    req_max_dist = requirements.max_distance_km if requirements else None
+    max_distance = search.max_distance_km or req_max_dist or (max(distances) if distances else 10)
 
     for listing in listings:
         breakdown: dict[str, float] = {}
