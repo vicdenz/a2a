@@ -57,9 +57,13 @@ def _load_scrape_cache() -> list[tuple[str, str, str]] | None:
     """Load scraped pages from disk cache."""
     if not os.path.exists(_SCRAPE_CACHE):
         return None
-    with open(_SCRAPE_CACHE) as f:
-        data = json.load(f)
-    pages = [(d["site"], d["url"], d["html"]) for d in data]
+    try:
+        with open(_SCRAPE_CACHE) as f:
+            data = json.load(f)
+        pages = [(d["site"], d["url"], d["html"]) for d in data]
+    except (json.JSONDecodeError, KeyError) as e:
+        print(f"  Cache file corrupt ({e}) — delete {_SCRAPE_CACHE} and re-run")
+        return None
     print(f"  Loaded {len(pages)} pages from scrape cache")
     return pages
 
@@ -77,9 +81,13 @@ def _load_extract_cache() -> list[Listing] | None:
     """Load extracted listings from disk cache."""
     if not os.path.exists(_EXTRACT_CACHE):
         return None
-    with open(_EXTRACT_CACHE) as f:
-        data = json.load(f)
-    listings = [Listing(**d) for d in data]
+    try:
+        with open(_EXTRACT_CACHE) as f:
+            data = json.load(f)
+        listings = [Listing(**d) for d in data]
+    except (json.JSONDecodeError, KeyError) as e:
+        print(f"  Cache file corrupt ({e}) — delete {_EXTRACT_CACHE} and re-run")
+        return None
     print(f"  Loaded {len(listings)} listings from extract cache")
     return listings
 
