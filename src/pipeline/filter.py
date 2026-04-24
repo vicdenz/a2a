@@ -51,11 +51,10 @@ def filter_listings(listings: list[Listing], requirements: RequirementsConfig) -
             if listing.pets_allowed is not None and listing.pets_allowed != requirements.must_allow_pets:
                 drop_reason = f"must_allow_pets (extracted: {listing.pets_allowed})"
 
-        # must_have_laundry — check both in-unit and shared
+        # must_have_laundry — drop only when both fields are explicitly False
         if drop_reason is None and requirements.must_have_laundry is not None and requirements.must_have_laundry:
-            has_laundry = (listing.laundry_in_unit is True) or (listing.laundry_shared is True)
-            if listing.laundry_in_unit is not None or listing.laundry_shared is not None:
-                if not has_laundry:
+            if listing.laundry_in_unit is False and listing.laundry_shared is not True:
+                if listing.laundry_shared is False:
                     drop_reason = "must_have_laundry (explicitly no laundry)"
 
         # must_have_parking — keep if missing
