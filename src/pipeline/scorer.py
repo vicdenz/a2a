@@ -8,6 +8,7 @@ def score_and_rank(
     listings: list[Listing],
     preferences: list[PreferenceConfig],
     search: SearchConfig,
+    requirements: RequirementsConfig | None = None,
 ) -> list[Listing]:
     """Score listings by weighted preferences and sort descending."""
     if not listings:
@@ -27,7 +28,8 @@ def score_and_rank(
     max_rent = max(rents) if rents else 1
 
     distances = [l.distance_km for l in listings if l.distance_km is not None]
-    max_distance = search.max_distance_km or (max(distances) if distances else 10)
+    req_max_dist = requirements.max_distance_km if requirements else None
+    max_distance = search.max_distance_km or req_max_dist or (max(distances) if distances else 10)
 
     for listing in listings:
         breakdown: dict[str, float] = {}
@@ -60,16 +62,27 @@ def score_and_rank(
                     if val is True:
                         points = pref.weight
 
+            elif pref.type == "neighbourhood_match":
+                # Full points if listing's neighbourhood matches any preferred value.
+                # Case-insensitive substring match (e.g. "Yorkville" matches "Bloor-Yorkville").
+                # No points if neighbourhood unknown — benefit of the doubt already handled by
+                # the distance scorer which rewards proximity to the anchor.
+                if pref.values and listing.neighbourhood is not None:
+                    hood = listing.neighbourhood.lower()
+                    if any(v.lower() in hood or hood in v.lower() for v in pref.values):
+                        points = pref.weight
+
             breakdown[pref.name] = round(points, 2)
             total += points
 
         listing.score = round(total, 2)
         listing.score_breakdown = breakdown
 
-    # Sort: by score descending, then null-price listings last
+    # Sort: passed_filter listings first, then by score desc, then null-price last
     listings.sort(
         key=lambda l: (
-            l.monthly_rent is not None,  # False (null price) sorts before True
+            l.passed_filter is True,
+            l.monthly_rent is not None,
             l.score or 0,
         ),
         reverse=True,

@@ -1,0 +1,171 @@
+# ─────────────────────────────────────────────
+# a2a — USER CONFIGURATION TEMPLATE
+# Copy to config.yaml and fill in the fields below.
+# ─────────────────────────────────────────────
+
+# ── Gemini AI Settings ────────────────────────
+# Free-tier limits (as of 2026-04):
+#   gemini-3.1-flash-lite-preview — 15 RPM, 250K TPM, 500 RPD  ← best free option
+#   gemini-2.5-flash-lite         — 10 RPM, 250K TPM,  20 RPD  ← too low for production
+ai:
+    model: "gemini-3.1-flash-lite-preview"
+    max_tokens: 8192
+    temperature: 0
+
+# ── Scraping Settings ─────────────────────────
+scraping:
+    headless: true
+    request_delay_ms: 1000
+    # Set to 50+ for production runs; keep at 10 for faster testing.
+    max_listings_per_site: 20
+    max_retries: 3
+    proxies: []
+
+# ── Websites to Scrape ────────────────────────
+websites:
+    - name: "Kijiji"
+      enabled: false
+      base_url: "https://www.kijiji.ca"
+      url_builder: "kijiji"
+      strategy: "crawlee"
+
+    - name: "Craigslist Toronto"
+      enabled: false
+      base_url: "https://toronto.craigslist.org"
+      url_builder: "craigslist"
+      strategy: "crawlee"
+
+    - name: "Rentals.ca"
+      enabled: false
+      base_url: "https://rentals.ca"
+      url_builder: "rentals_ca"
+      strategy: "crawlee"
+
+    - name: "Airbnb (Monthly Stays)"
+      enabled: false
+      base_url: "https://www.airbnb.ca"
+      url_builder: "airbnb"
+      strategy: "zendriver"
+
+# ─────────────────────────────────────────────
+# SEARCH PARAMETERS
+# Used to build search URLs and set the scraping radius.
+# Detailed filtering happens in the HARD REQUIREMENTS section below.
+# ─────────────────────────────────────────────
+
+search:
+    city: "<enter city, e.g. Toronto>"
+    anchor_address: "<enter full address, e.g. 100 Queen St W, Toronto, ON>"
+    max_distance_km: null # radius in km around anchor_address
+    move_in_date: "<YYYY-MM-DD>"
+    lease_duration_months: null # used by Airbnb to compute checkout date
+    max_monthly_rent: null # upper price cap injected into search URLs (CAD)
+
+# ─────────────────────────────────────────────
+# HARD REQUIREMENTS
+# Listings that fail ANY of these are dropped entirely.
+# Set to null to disable a requirement.
+# ─────────────────────────────────────────────
+
+requirements:
+    max_monthly_rent: null
+    min_bedrooms: null
+    max_distance_km: null
+    must_be_furnished: null
+    must_have_laundry: null
+    require_short_term: false
+    must_allow_pets: null
+    must_have_parking: null
+    # Drop listings outside these neighbourhoods (case-insensitive, substring match).
+    # Leave empty [] to allow all neighbourhoods (recommended — use max_distance_km instead).
+    # AI-extracted neighbourhood names are unreliable so this filter can be aggressive.
+    allowed_neighbourhoods: []
+    # Specific to Rentals.ca: list of neighbourhood slugs to scrape (e.g. ["yorkville", "the-annex"]).
+    # Leave empty [] to auto-pick neighbourhoods within 1.5km of anchor_address.
+    # Valid slugs are defined in _RENTALS_CA_NEIGHBOURHOODS in src/scraper/sites.py.
+    # Listings are scraped equally across all selected neighbourhoods.
+    # NOTE: only Toronto neighbourhoods are currently defined — other cities fall back to the city-level URL.
+    rentals_ca_neighbourhoods: []
+
+# ─────────────────────────────────────────────
+# PREFERENCES (Weighted Scoring)
+# Enable the ones you care about and tune weights.
+# ─────────────────────────────────────────────
+
+preferences:
+    - name: "Prefer specific neighbourhoods"
+      enabled: false
+      weight: 8
+      description: "Prefer listings in certain neighbourhoods"
+      type: "neighbourhood_match"
+      values: [] # e.g. ["Yorkville", "The Annex"]
+
+    - name: "Close to anchor address"
+      enabled: false
+      weight: 9
+      description: "Prefer listings closer to anchor_address"
+      type: "distance"
+
+    - name: "In-unit laundry"
+      enabled: false
+      weight: 10
+      description: "Prefer in-unit washer/dryer"
+      type: "boolean_field"
+      field: "laundry_in_unit"
+
+    - name: "Furnished"
+      enabled: false
+      weight: 9
+      description: "Prefer furnished units"
+      type: "boolean_field"
+      field: "furnished"
+
+    - name: "Utilities included"
+      enabled: false
+      weight: 4
+      description: "Prefer rent that includes heat/hydro/water"
+      type: "boolean_field"
+      field: "utilities_included"
+
+    - name: "Balcony or outdoor space"
+      enabled: false
+      weight: 2
+      description: "Prefer units with a balcony, terrace, or yard"
+      type: "boolean_field"
+      field: "outdoor_space"
+
+    - name: "Gym / fitness center"
+      enabled: false
+      weight: 7
+      description: "Prefer buildings with a gym"
+      type: "boolean_field"
+      field: "gym"
+
+    - name: "Lower rent"
+      enabled: false
+      weight: 6
+      description: "Prefer listings with lower monthly rent"
+      type: "price_asc"
+
+    - name: "Parking included"
+      enabled: false
+      weight: 1
+      description: "Prefer listings with parking"
+      type: "boolean_field"
+      field: "parking_included"
+
+    - name: "Pets allowed"
+      enabled: false
+      weight: 1
+      description: "Prefer pet-friendly listings"
+      type: "boolean_field"
+      field: "pets_allowed"
+
+# ── Output Settings ───────────────────────────
+output:
+    directory: "./output"
+    formats:
+        - "html"
+        - "json"
+        - "csv"
+    open_html_on_complete: true

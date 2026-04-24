@@ -13,7 +13,7 @@ class Listing(BaseModel):
 
     # Location
     address: str | None = None
-    neighborhood: str | None = None
+    neighbourhood: str | None = None
     city: str | None = None
     latitude: float | None = None
     longitude: float | None = None
@@ -58,16 +58,20 @@ class Listing(BaseModel):
     score: float | None = None
     score_breakdown: dict | None = None
 
+    # Filtering (populated by pipeline)
+    passed_filter: bool | None = None
+    filter_reason: str | None = None
+
     # Meta
     scraped_at: datetime = Field(default_factory=datetime.now)
-    raw_html_hash: str | None = None
+    cleaned_html_hash: str | None = None
 
 
 # JSON schema string for the extraction prompt — excludes pipeline-only fields
 EXTRACTION_FIELDS: dict = {
     "listing_id": "string or null",
     "address": "string or null",
-    "neighborhood": "string or null",
+    "neighbourhood": "string or null",
     "city": "string or null",
     "title": "string or null",
     "description": "string or null — first 500 chars of listing description",

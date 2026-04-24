@@ -1,10 +1,25 @@
+# System
+.DS_Store
+
+# Secrets
 .env
-output/
+
+# Local config (user-specific search params — see config.example.yaml for the template)
+config.yaml
+
+# Runtime output (reports, scrape cache)
+/output/
+
+# Python
 __pycache__/
 *.pyc
-.venv/
 *.egg-info/
+.venv/
+.pytest_cache/
+
+# Crawlee state
 .crawlee/
 
+# Local AI instructions
 CLAUDE.md
-PLAN.md
+.claude

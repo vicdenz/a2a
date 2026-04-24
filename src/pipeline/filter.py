@@ -5,70 +5,93 @@ from src.extractor.schema import Listing
 
 
 def filter_listings(listings: list[Listing], requirements: RequirementsConfig) -> list[Listing]:
-    """Apply hard requirement filters. Listings failing ANY enabled filter are dropped."""
-    passed: list[Listing] = []
+    """Tag listings with passed_filter / filter_reason. Returns ALL listings unchanged in count."""
     drop_counts: dict[str, int] = {}
+    passed_count = 0
 
     for listing in listings:
-        dropped = False
+        drop_reason: str | None = None
+
+        # allowed_neighbourhoods — if set, drop listings whose neighbourhood
+        # is known but doesn't match any of the allowed values (case-insensitive).
+        # Listings with unknown neighbourhood are kept (benefit of the doubt).
+        if requirements.allowed_neighbourhoods:
+            allowed = [n.lower() for n in requirements.allowed_neighbourhoods]
+            if listing.neighbourhood is not None:
+                listing_hood = listing.neighbourhood.lower()
+                if not any(a in listing_hood or listing_hood in a for a in allowed):
+                    drop_reason = "allowed_neighbourhoods"
 
         # max_monthly_rent — drop if missing or exceeds
-        if requirements.max_monthly_rent is not None:
-            if listing.monthly_rent is None or listing.monthly_rent > requirements.max_monthly_rent:
-                drop_counts["max_monthly_rent"] = drop_counts.get("max_monthly_rent", 0) + 1
-                dropped = True
+        if drop_reason is None and requirements.max_monthly_rent is not None:
+            if listing.monthly_rent is None:
+                drop_reason = "max_monthly_rent (rent unknown)"
+            elif listing.monthly_rent > requirements.max_monthly_rent:
+                drop_reason = f"max_monthly_rent (${listing.monthly_rent:.0f} > ${requirements.max_monthly_rent})"
 
         # min_bedrooms — keep if missing (benefit of the doubt)
-        if not dropped and requirements.min_bedrooms is not None:
+        if drop_reason is None and requirements.min_bedrooms is not None:
             if listing.bedrooms is not None and listing.bedrooms < requirements.min_bedrooms:
-                drop_counts["min_bedrooms"] = drop_counts.get("min_bedrooms", 0) + 1
-                dropped = True
+                drop_reason = f"min_bedrooms ({listing.bedrooms} < {requirements.min_bedrooms})"
 
         # max_distance_km — drop if missing or exceeds
-        if not dropped and requirements.max_distance_km is not None:
-            if listing.distance_km is None or listing.distance_km > requirements.max_distance_km:
-                drop_counts["max_distance_km"] = drop_counts.get("max_distance_km", 0) + 1
-                dropped = True
+        if drop_reason is None and requirements.max_distance_km is not None:
+            if listing.distance_km is None:
+                drop_reason = "max_distance_km (distance unknown — geocoding failed or address not extracted)"
+            elif listing.distance_km > requirements.max_distance_km:
+                drop_reason = f"max_distance_km ({listing.distance_km:.1f}km > {requirements.max_distance_km}km)"
 
         # must_be_furnished — keep if missing (benefit of the doubt)
-        if not dropped and requirements.must_be_furnished is not None:
+        if drop_reason is None and requirements.must_be_furnished is not None:
             if listing.furnished is not None and listing.furnished != requirements.must_be_furnished:
-                drop_counts["must_be_furnished"] = drop_counts.get("must_be_furnished", 0) + 1
-                dropped = True
+                drop_reason = f"must_be_furnished (extracted: {listing.furnished})"
 
         # must_allow_pets — keep if missing
-        if not dropped and requirements.must_allow_pets is not None:
+        if drop_reason is None and requirements.must_allow_pets is not None:
             if listing.pets_allowed is not None and listing.pets_allowed != requirements.must_allow_pets:
-                drop_counts["must_allow_pets"] = drop_counts.get("must_allow_pets", 0) + 1
-                dropped = True
+                drop_reason = f"must_allow_pets (extracted: {listing.pets_allowed})"
 
-        # must_have_laundry — check both in-unit and shared
-        if not dropped and requirements.must_have_laundry is not None and requirements.must_have_laundry:
-            has_laundry = (listing.laundry_in_unit is True) or (listing.laundry_shared is True)
-            if listing.laundry_in_unit is not None or listing.laundry_shared is not None:
-                if not has_laundry:
-                    drop_counts["must_have_laundry"] = drop_counts.get("must_have_laundry", 0) + 1
-                    dropped = True
+        # must_have_laundry — drop only when both fields are explicitly False
+        if drop_reason is None and requirements.must_have_laundry is not None and requirements.must_have_laundry:
+            if listing.laundry_in_unit is False and listing.laundry_shared is not True:
+                if listing.laundry_shared is False:
+                    drop_reason = "must_have_laundry (explicitly no laundry)"
 
         # must_have_parking — keep if missing
-        if not dropped and requirements.must_have_parking is not None:
+        if drop_reason is None and requirements.must_have_parking is not None:
             if listing.parking_included is not None and listing.parking_included != requirements.must_have_parking:
-                drop_counts["must_have_parking"] = drop_counts.get("must_have_parking", 0) + 1
-                dropped = True
+                drop_reason = f"must_have_parking (extracted: {listing.parking_included})"
 
-        # short_term_ok — keep if missing
-        if not dropped and requirements.short_term_ok:
+        # require_short_term — keep if missing
+        if drop_reason is None and requirements.require_short_term:
             if listing.short_term_available is not None and listing.short_term_available is False:
-                drop_counts["short_term_ok"] = drop_counts.get("short_term_ok", 0) + 1
-                dropped = True
+                drop_reason = "require_short_term (explicitly not short-term)"
 
-        if not dropped:
-            passed.append(listing)
+        if drop_reason is None:
+            listing.passed_filter = True
+            listing.filter_reason = None
+            passed_count += 1
+        else:
+            listing.passed_filter = False
+            listing.filter_reason = drop_reason
+            label = listing.address or listing.url[:60]
+            print(f"  FILTERED [{listing.source}] {label[:60]} — {drop_reason}")
+            drop_counts[drop_reason.split(" (")[0]] = drop_counts.get(drop_reason.split(" (")[0], 0) + 1
 
-    # Log filter results
-    total_dropped = len(listings) - len(passed)
-    print(f"  Filtered: {len(passed)} passed, {total_dropped} dropped")
+    # Log filter summary
+    print(f"  Filtered: {passed_count} passed, {len(listings) - passed_count} failed (kept for HTML toggle)")
     for rule, count in sorted(drop_counts.items()):
-        print(f"    {rule}: {count} dropped")
+        print(f"    {rule}: {count} failed")
 
-    return passed
+    # Show distance breakdown for passed listings
+    if passed_count and requirements.max_distance_km is not None:
+        passed = [l for l in listings if l.passed_filter]
+        with_dist = [(l.distance_km, l.neighbourhood or l.address or l.url[:50]) for l in passed if l.distance_km is not None]
+        no_dist = [l for l in passed if l.distance_km is None]
+        if with_dist:
+            with_dist.sort()
+            print(f"  Distance range of passed listings: {with_dist[0][0]:.1f}–{with_dist[-1][0]:.1f} km")
+        if no_dist:
+            print(f"  Warning: {len(no_dist)} passed listing(s) have no distance (geocoding failed)")
+
+    return listings

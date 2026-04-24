@@ -18,7 +18,7 @@ def test_listing_full():
         source="Kijiji",
         listing_id="abc123",
         address="123 Main St",
-        neighborhood="Annex",
+        neighbourhood="Annex",
         city="Toronto",
         latitude=43.66,
         longitude=-79.39,

@@ -39,18 +39,13 @@ class SiteConfig(BaseModel):
 
 class SearchConfig(BaseModel):
     city: str = ""
-    neighborhood: str = ""
     anchor_address: str = ""
+    anchor_lat: float | None = None   # geocoded at startup from anchor_address
+    anchor_lng: float | None = None   # geocoded at startup from anchor_address
     max_distance_km: float | None = None
     move_in_date: str = ""
     lease_duration_months: int | None = None
-    min_bedrooms: int | None = None
-    max_bedrooms: int | None = None
-    min_bathrooms: int | None = None
-    unit_types: list[str] = Field(default_factory=list)
     max_monthly_rent: float | None = None
-    min_monthly_rent: float | None = None
-    min_sqft: int | None = None
 
 
 class RequirementsConfig(BaseModel):
@@ -61,7 +56,11 @@ class RequirementsConfig(BaseModel):
     must_allow_pets: bool | None = None
     must_have_laundry: bool | None = None
     must_have_parking: bool | None = None
-    short_term_ok: bool = True
+    require_short_term: bool = False
+    allowed_neighbourhoods: list[str] = Field(default_factory=list)
+    # Rentals.ca: explicit neighbourhood slugs to scrape. Empty list = auto-pick
+    # neighbourhoods adjacent to anchor_address (current behaviour).
+    rentals_ca_neighbourhoods: list[str] = Field(default_factory=list)
 
 
 class PreferenceConfig(BaseModel):
@@ -71,6 +70,7 @@ class PreferenceConfig(BaseModel):
     description: str
     type: str
     field: str | None = None
+    values: list[str] = Field(default_factory=list)  # used by neighbourhood_match type
 
 
 class OutputConfig(BaseModel):
@@ -87,7 +87,7 @@ class AppConfig(BaseModel):
     requirements: RequirementsConfig
     preferences: list[PreferenceConfig]
     output: OutputConfig
-    anthropic_api_key: str
+    gemini_api_key: str
 
 
 def load_config(config_path: str = "config.yaml") -> AppConfig:
@@ -100,9 +100,14 @@ def load_config(config_path: str = "config.yaml") -> AppConfig:
     with open(path) as f:
         raw = yaml.safe_load(f)
 
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    api_key = os.environ.get("GEMINI_API_KEY", "")
     if not api_key:
-        raise ValueError("ANTHROPIC_API_KEY not set in .env or environment")
+        raise ValueError("GEMINI_API_KEY not set in .env or environment")
+
+    required_sections = ("ai", "scraping", "websites", "search", "requirements", "preferences", "output")
+    for section in required_sections:
+        if section not in raw:
+            raise ValueError(f"Missing required section '{section}' in {config_path}")
 
     return AppConfig(
         ai=AIConfig(**raw["ai"]),
@@ -112,5 +117,5 @@ def load_config(config_path: str = "config.yaml") -> AppConfig:
         requirements=RequirementsConfig(**raw["requirements"]),
         preferences=[PreferenceConfig(**p) for p in raw["preferences"]],
         output=OutputConfig(**raw["output"]),
-        anthropic_api_key=api_key,
+        gemini_api_key=api_key,
     )

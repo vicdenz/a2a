@@ -73,7 +73,7 @@ class CamoufoxStrategy(ScraperStrategy):
         await self._ensure_browser(scraping_config)
         page = await self._browser.new_page()
         try:
-            # Inject cookies if provided (e.g. Facebook)
+            # Inject cookies if the site config provides them
             if site_config.cookies:
                 cookie_list = [
                     {"name": c.name, "value": c.value, "domain": c.domain, "path": "/"}
@@ -88,11 +88,12 @@ class CamoufoxStrategy(ScraperStrategy):
             await page.close()
 
     async def close(self) -> None:
-        if self._browser:
+        if hasattr(self, "_camoufox"):
             try:
                 await self._camoufox.__aexit__(None, None, None)
             except Exception:
                 pass
+            del self._camoufox
             self._browser = None
 
 
@@ -118,7 +119,7 @@ class ZendriverStrategy(ScraperStrategy):
     async def close(self) -> None:
         if self._browser:
             try:
-                self._browser.stop()
+                await self._browser.stop()
             except Exception:
                 pass
             self._browser = None
