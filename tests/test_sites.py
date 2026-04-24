@@ -1,5 +1,7 @@
 from urllib.parse import parse_qs, urlparse
 
+import pytest
+
 from src.config import RequirementsConfig, SearchConfig, SiteConfig
 from src.scraper.sites import build_search_urls
 
@@ -172,6 +174,12 @@ def test_craigslist_radius():
     assert "lon" in params
     assert "search_distance" in params
     assert "max_price" in params
+
+
+def test_craigslist_unsupported_city():
+    """Craigslist should raise ValueError for unsupported cities."""
+    with pytest.raises(ValueError, match="Unsupported Craigslist city"):
+        build_search_urls(_site("craigslist"), SearchConfig(city="Saskatoon"))
 
 
 def test_kijiji_max_price():
