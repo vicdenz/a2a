@@ -91,7 +91,11 @@ async def scrape_all(config: AppConfig) -> list[tuple[str, str, str]]:
 
             # Build search URL groups. Each group is one logical bucket (e.g. a
             # rentals.ca neighbourhood); sites without buckets return one group.
-            url_groups = build_search_urls(site, config.search, config.requirements)
+            try:
+                url_groups = build_search_urls(site, config.search, config.requirements)
+            except ValueError as e:
+                print(f"  Skipping {site.name}: {e}")
+                continue
             total_pages = sum(len(g) for g in url_groups)
             total_quota = config.scraping.max_listings_per_site
             per_group_quota = max(1, total_quota // max(1, len(url_groups)))
