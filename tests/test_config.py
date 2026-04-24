@@ -85,6 +85,24 @@ def test_load_config_missing_api_key(monkeypatch):
             os.unlink(f.name)
 
 
+def test_load_config_missing_section():
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+        _write_config(f.name)
+        # Re-read, remove a required section, rewrite
+        with open(f.name) as rf:
+            data = yaml.safe_load(rf)
+        del data["ai"]
+        with open(f.name, "w") as wf:
+            yaml.dump(data, wf)
+        os.environ["GEMINI_API_KEY"] = "test-key"
+        try:
+            with pytest.raises(ValueError, match="Missing required section 'ai'"):
+                load_config(f.name)
+        finally:
+            os.environ.pop("GEMINI_API_KEY", None)
+            os.unlink(f.name)
+
+
 def test_load_config_missing_file():
     with pytest.raises(FileNotFoundError):
         load_config("/nonexistent/config.yaml")
