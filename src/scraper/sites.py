@@ -25,8 +25,13 @@ _KIJIJI_CITY_SLUGS: dict[str, tuple[str, str]] = {
 
 
 def _kijiji(search: SearchConfig, requirements: RequirementsConfig) -> list[list[str]]:
-    city_key = (search.city or "Toronto").lower()
-    slug, loc_code = _KIJIJI_CITY_SLUGS.get(city_key, ("city-of-toronto", "1700273"))
+    city_key = (search.city or "toronto").lower()
+    if city_key not in _KIJIJI_CITY_SLUGS:
+        raise ValueError(
+            f"Unsupported Kijiji city: '{search.city}'. "
+            f"Supported: {', '.join(sorted(_KIJIJI_CITY_SLUGS))}"
+        )
+    slug, loc_code = _KIJIJI_CITY_SLUGS[city_key]
 
     suffix = f"c37l{loc_code}"
 

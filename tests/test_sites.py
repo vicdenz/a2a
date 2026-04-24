@@ -182,6 +182,12 @@ def test_craigslist_unsupported_city():
         build_search_urls(_site("craigslist"), SearchConfig(city="Saskatoon"))
 
 
+def test_kijiji_unsupported_city():
+    """Kijiji should raise ValueError for unsupported cities."""
+    with pytest.raises(ValueError, match="Unsupported Kijiji city"):
+        build_search_urls(_site("kijiji"), SearchConfig(city="Saskatoon"))
+
+
 def test_kijiji_max_price():
     """Kijiji should pass max rent as maxPrice."""
     search = SearchConfig(city="Toronto", max_monthly_rent=3000)
