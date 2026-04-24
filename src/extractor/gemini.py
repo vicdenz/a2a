@@ -19,6 +19,8 @@ from src.extractor.schema import EXTRACTION_FIELDS, Listing
 # Suppress noisy gRPC fork warnings from Playwright + genai coexistence
 os.environ.setdefault("GRPC_ENABLE_FORK_SUPPORT", "0")
 
+_geolocator = Nominatim(user_agent="a2a")
+
 # Free-tier Gemini rate limits (RPM = requests per minute).
 # gemini-2.0-flash-lite free tier: 15 RPM, 1500 RPD, 1M TPM.
 # We use 12 RPM to leave a comfortable margin.
@@ -316,7 +318,6 @@ async def _geocode_listing(
     if not listing.address or not listing.city:
         return
 
-    geolocator = Nominatim(user_agent="a2a")
     query = f"{listing.address}, {listing.city}"
 
     async with _geocode_lock:
@@ -327,7 +328,7 @@ async def _geocode_listing(
 
         try:
             loop = asyncio.get_running_loop()
-            location = await loop.run_in_executor(None, geolocator.geocode, query)
+            location = await loop.run_in_executor(None, _geolocator.geocode, query)
         except Exception:
             return
 
